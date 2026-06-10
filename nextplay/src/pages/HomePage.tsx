@@ -23,7 +23,7 @@ const TEAMS = [
     division: "2015/16B Blue Star",
     color: "#4169E1",
     accent: "#FFB81C",
-    tools: 0,
+    tools: 1,
   },
 ];
 
