@@ -15,6 +15,7 @@ export default function App() {
       <Route path="/2011-12g" element={<Team2011112G />} />
       <Route path="/2015-16b" element={<Team201516B />} />
       <Route path="/2015-16b/germany-bio" element={<GermanyBioGenerator />} />
+      <Route path="/2016b-blue-star" element={<LouFuszGenerator />} />
     </Routes>
   );
 }
