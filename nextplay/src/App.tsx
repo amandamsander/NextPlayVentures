@@ -5,6 +5,7 @@ import Team2011112G from "./pages/lou-fusz-2011-12g/TeamPage";
 import Team201516B from "./pages/lou-fusz-2015-16b/TeamPage";
 import PlayerCardGenerator from "./pages/lou-fusz-2013ga/PlayerCardGenerator";
 import GermanyBioGenerator from "./pages/lou-fusz-2015-16b/GermanyBioGenerator";
+import LouFuszGenerator from "./pages/lou-fusz-2015-16b/LouFuszGenerator";
 
 export default function App() {
   return (
