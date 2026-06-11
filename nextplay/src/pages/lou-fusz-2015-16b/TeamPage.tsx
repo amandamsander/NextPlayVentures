@@ -45,6 +45,32 @@ export default function Team201516B() {
           </div>
         </button>
 
+        {/* Player Card Generator */}
+<button
+  onClick={() => navigate("/2015-16b/player-card")}
+  style={{
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 12,
+    padding: "24px 28px",
+    textAlign: "left",
+    cursor: "pointer",
+    transition: "background 0.2s",
+  }}
+  onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+  onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+>
+  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700, color: "#4169E1", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>
+    ⚽ Blue Star
+  </div>
+  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 4 }}>
+    Player Card Generator
+  </div>
+  <div style={{ fontFamily: "'Barlow', sans-serif", fontSize: 13, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
+    Generate a custom Lou Fusz Blue Star player card. Enter name, jersey number, position, and grad year — download as a full-resolution PNG.
+  </div>
+</button>
+
       </div>
     </div>
   );
