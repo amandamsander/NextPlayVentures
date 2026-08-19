@@ -156,18 +156,37 @@
   }
   .row-remove-btn:hover { border-color: var(--card-red, #e34948); color: var(--card-red, #e34948); }
 
-  .quick-log-head-row, .quick-log-row {
-    display: grid;
-    grid-template-columns: 1.6fr repeat(7, 0.7fr);
-    gap: 6px; align-items: center;
+  .ql-card {
+    background: var(--surface-1); border: 1.5px solid var(--gridline); border-radius: 10px;
+    padding: 10px 10px 8px; margin-bottom: 8px;
   }
-  .quick-log-head-row {
-    font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em;
-    margin-bottom: 6px; padding: 0 2px;
+  .ql-card .qname { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .ql-field-group {
+    display: flex; gap: 6px; margin-bottom: 6px;
   }
-  .quick-log-row { margin-bottom: 6px; }
-  .quick-log-row .qname { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .quick-log-row input.text-input { text-align: center; padding: 8px 4px; font-size: 13px; }
+  .ql-field-group:last-child { margin-bottom: 0; }
+  .ql-field { flex: 1; min-width: 0; }
+  .ql-field label {
+    display: block; font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--muted); margin-bottom: 2px; text-align: center;
+  }
+  .ql-field input.text-input {
+    text-align: center; padding: 7px 2px; font-size: 13px; width: 100%;
+  }
+  .ql-group-label {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .ql-validation-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid var(--gridline); font-size: 13px;
+  }
+  .ql-validation-row:last-child { border-bottom: none; }
+  .ql-validation-row .ql-v-label { color: var(--text-secondary); }
+  .ql-validation-row .ql-v-value { font-weight: 700; font-family: var(--font-heading); }
+  .ql-validation-row.ok .ql-v-value { color: var(--success); }
+  .ql-validation-row.off .ql-v-value { color: var(--gold); }
 
   .start-btn {
     font-family: var(--font-heading);
@@ -600,11 +619,15 @@
       <div class="field-row" style="margin-top:10px;">
         <div class="field-col">
           <span class="field-label">Format</span>
-          <select class="select-input" id="quickLogFormatInput">
+          <select class="select-input" id="quickLogFormatInput" onchange="renderQuickLogValidation()">
             <option value="7v7">7v7</option>
             <option value="9v9">9v9</option>
             <option value="11v11">11v11</option>
           </select>
+        </div>
+        <div class="field-col">
+          <span class="field-label">Opponent goals (regular time)</span>
+          <input type="number" class="text-input" id="quickLogOppGoalsInput" min="0" value="0" oninput="renderQuickLogValidation()">
         </div>
       </div>
     </div>
@@ -613,19 +636,15 @@
       <div class="setup-card-head">
         <h2>3. Per-player stats</h2>
       </div>
-      <div class="hint">Enter final totals for each player who played — leave a player at all zeros if they didn't play (they'll just be skipped).</div>
-      <div class="quick-log-head-row">
-        <div>Player</div>
-        <div>Min</div>
-        <div>GF*</div>
-        <div>GA*</div>
-        <div>G</div>
-        <div>A</div>
-        <div>🟨</div>
-        <div>🟥</div>
-      </div>
+      <div class="hint">Enter final totals for each player who played — leave a player at all zeros if they didn't play (they'll just be skipped). Goals are split by how they were scored; OT/PK is for a penalty shootout after the final whistle — those don't count toward on-field minutes or goals.</div>
       <div id="quickLogPlayerRows"></div>
-      <div class="hint" style="margin-top:8px;">*GF/GA = team goals scored/allowed while this player was on the field (optional — leave 0 if unsure).</div>
+    </div>
+
+    <div class="setup-card">
+      <h2>4. Does it add up?</h2>
+      <div class="hint">Regular-time on-field math: minutes should total the full game length × players on the field; goals-for/against should total (team goals scored/allowed) × players on the field for each one — same girls can count for more than one goal. OT/PK goals are tracked but excluded from these checks since no one's "on the field" for a shootout in the usual sense.</div>
+      <div id="quickLogValidation"></div>
+      <button class="export-btn" onclick="prorateQuickLogMinutes()">⚖️ Auto-prorate minutes to fit exactly</button>
     </div>
 
     <button class="start-btn" id="quickLogSaveBtn" onclick="saveQuickLoggedGame()">💾 Save this game</button>
@@ -837,6 +856,7 @@
       <button class="goal-type-btn" onclick="finishGoal('PK')">Penalty kick<span class="sub">PK</span></button>
       <button class="goal-type-btn" onclick="finishGoal('FK')">Free kick<span class="sub">FK</span></button>
       <button class="goal-type-btn" onclick="finishGoal('R')">Run of play<span class="sub">R</span></button>
+      <button class="goal-type-btn" onclick="finishGoal('OT')">OT / shootout<span class="sub">OT/PK</span></button>
     </div>
   </div>
 </div>
@@ -1239,6 +1259,7 @@ function goToQuickLog() {
   document.getElementById('quickLogDateInput').value = new Date().toISOString().slice(0, 10);
   document.getElementById('quickLogGameTypeInput').value = 'F';
   document.getElementById('quickLogFormatInput').value = '9v9';
+  document.getElementById('quickLogOppGoalsInput').value = '0';
   renderQuickLogTeamChoices();
   renderQuickLogPlayerRows();
   renderQuickLogSaveState();
@@ -1275,25 +1296,40 @@ function renderQuickLogPlayerRows() {
   const el = document.getElementById('quickLogPlayerRows');
   if (!quickLogTeamKey || !TEAMS[quickLogTeamKey]) {
     el.innerHTML = '<div class="log-empty">Pick a team above to list its roster.</div>';
+    renderQuickLogValidation();
     return;
   }
   const roster = TEAMS[quickLogTeamKey].roster || [];
   if (!roster.length) {
     el.innerHTML = '<div class="log-empty">This team has no players saved yet.</div>';
+    renderQuickLogValidation();
     return;
   }
   el.innerHTML = roster.map((p, i) => `
-    <div class="quick-log-row" data-player-name="${escapeAttr(p.name)}">
+    <div class="ql-card" data-player-name="${escapeAttr(p.name)}">
       <div class="qname">${escapeAttr(p.name)}${p.num ? ' #' + escapeAttr(p.num) : ''}</div>
-      <input type="number" class="text-input ql-minutes" min="0" value="0">
-      <input type="number" class="text-input ql-gf" min="0" value="0">
-      <input type="number" class="text-input ql-ga" min="0" value="0">
-      <input type="number" class="text-input ql-goals" min="0" value="0">
-      <input type="number" class="text-input ql-assists" min="0" value="0">
-      <input type="number" class="text-input ql-yellows" min="0" value="0">
-      <input type="number" class="text-input ql-reds" min="0" value="0">
+      <div class="ql-group-label">On-field</div>
+      <div class="ql-field-group">
+        <div class="ql-field"><label>Min</label><input type="number" class="text-input ql-minutes" min="0" value="0" oninput="renderQuickLogValidation()"></div>
+        <div class="ql-field"><label>GF</label><input type="number" class="text-input ql-gf" min="0" value="0" oninput="renderQuickLogValidation()"></div>
+        <div class="ql-field"><label>GA</label><input type="number" class="text-input ql-ga" min="0" value="0" oninput="renderQuickLogValidation()"></div>
+      </div>
+      <div class="ql-group-label">Goals by type</div>
+      <div class="ql-field-group">
+        <div class="ql-field"><label>Run</label><input type="number" class="text-input ql-goals-r" min="0" value="0" oninput="renderQuickLogValidation()"></div>
+        <div class="ql-field"><label>FK</label><input type="number" class="text-input ql-goals-fk" min="0" value="0" oninput="renderQuickLogValidation()"></div>
+        <div class="ql-field"><label>PK</label><input type="number" class="text-input ql-goals-pk" min="0" value="0" oninput="renderQuickLogValidation()"></div>
+        <div class="ql-field"><label>OT/PK</label><input type="number" class="text-input ql-goals-ot" min="0" value="0" oninput="renderQuickLogValidation()"></div>
+      </div>
+      <div class="ql-group-label">Other</div>
+      <div class="ql-field-group">
+        <div class="ql-field"><label>A</label><input type="number" class="text-input ql-assists" min="0" value="0"></div>
+        <div class="ql-field"><label>🟨</label><input type="number" class="text-input ql-yellows" min="0" value="0"></div>
+        <div class="ql-field"><label>🟥</label><input type="number" class="text-input ql-reds" min="0" value="0"></div>
+      </div>
     </div>
   `).join('');
+  renderQuickLogValidation();
 }
 
 function renderQuickLogSaveState() {
@@ -1302,26 +1338,113 @@ function renderQuickLogSaveState() {
   btn.disabled = !(quickLogTeamKey && opponent);
 }
 
+// Reads every player card into plain numbers — shared by the payload builder,
+// the live validation summary, and the prorate-minutes tool.
+function readQuickLogRows() {
+  const cards = document.querySelectorAll('#quickLogPlayerRows .ql-card');
+  return Array.from(cards).map(card => ({
+    el: card,
+    name: card.getAttribute('data-player-name'),
+    minutes: Number(card.querySelector('.ql-minutes').value) || 0,
+    goalsFor: Number(card.querySelector('.ql-gf').value) || 0,
+    goalsAgainst: Number(card.querySelector('.ql-ga').value) || 0,
+    goalsR: Number(card.querySelector('.ql-goals-r').value) || 0,
+    goalsFK: Number(card.querySelector('.ql-goals-fk').value) || 0,
+    goalsPK: Number(card.querySelector('.ql-goals-pk').value) || 0,
+    goalsOT: Number(card.querySelector('.ql-goals-ot').value) || 0,
+    assists: Number(card.querySelector('.ql-assists').value) || 0,
+    yellows: Number(card.querySelector('.ql-yellows').value) || 0,
+    reds: Number(card.querySelector('.ql-reds').value) || 0
+  }));
+}
+
+function quickLogExpectedOnField() {
+  const formatKey = document.getElementById('quickLogFormatInput').value;
+  const format = FORMATS[formatKey];
+  return { onField: format.positions.length, fullGameMin: format.standardHalfMin * 2 };
+}
+
+function renderQuickLogValidation() {
+  const el = document.getElementById('quickLogValidation');
+  if (!el) return;
+  const rows = readQuickLogRows();
+  const { onField, fullGameMin } = quickLogExpectedOnField();
+  const oppGoals = Number(document.getElementById('quickLogOppGoalsInput').value) || 0;
+
+  const totalMinutes = rows.reduce((s, r) => s + r.minutes, 0);
+  const totalGF = rows.reduce((s, r) => s + r.goalsFor, 0);
+  const totalGA = rows.reduce((s, r) => s + r.goalsAgainst, 0);
+  const regularGoals = rows.reduce((s, r) => s + r.goalsR + r.goalsFK + r.goalsPK, 0);
+  const otGoals = rows.reduce((s, r) => s + r.goalsOT, 0);
+
+  const expectedMinutes = fullGameMin * onField;
+  const expectedGF = regularGoals * onField;
+  const expectedGA = oppGoals * onField;
+
+  const row = (label, actual, expected, extraNote) => {
+    const ok = actual === expected;
+    return `<div class="ql-validation-row ${ok ? 'ok' : 'off'}">
+      <div class="ql-v-label">${label}${extraNote ? ` <span style="opacity:0.7;">(${extraNote})</span>` : ''}</div>
+      <div class="ql-v-value">${actual} / ${expected}${ok ? ' ✓' : ''}</div>
+    </div>`;
+  };
+
+  el.innerHTML =
+    row('Minutes', totalMinutes, expectedMinutes, `${fullGameMin}min × ${onField} on field`) +
+    row('Goals for (on field)', totalGF, expectedGF, `${regularGoals} goal${regularGoals === 1 ? '' : 's'} × ${onField} on field`) +
+    row('Goals against (on field)', totalGA, expectedGA, `${oppGoals} opp. goal${oppGoals === 1 ? '' : 's'} × ${onField} on field`) +
+    `<div class="ql-validation-row"><div class="ql-v-label">OT/PK goals (yours, excluded above)</div><div class="ql-v-value">${otGoals}</div></div>`;
+}
+
+function prorateQuickLogMinutes() {
+  // Only redistribute among players who actually have minutes entered —
+  // players left at 0 (didn't play) should stay at 0, not get dragged into
+  // the rounding remainder and end up with phantom minutes.
+  const rows = readQuickLogRows().filter(r => r.minutes > 0);
+  const { onField, fullGameMin } = quickLogExpectedOnField();
+  const expectedMinutes = fullGameMin * onField;
+  const totalMinutes = rows.reduce((s, r) => s + r.minutes, 0);
+  if (!totalMinutes) { showToast('Enter some minutes first'); return; }
+
+  // Scale everyone proportionally, then hand out any rounding remainder to
+  // whoever has the largest fractional remainder — same spirit as how
+  // live-tracked games get normalized to fit the standard half exactly.
+  const scale = expectedMinutes / totalMinutes;
+  const scaled = rows.map(r => ({ r, raw: r.minutes * scale, rounded: Math.max(1, Math.round(r.minutes * scale)) }));
+  let diff = expectedMinutes - scaled.reduce((s, x) => s + x.rounded, 0);
+  scaled.sort((a, b) => b.raw - b.rounded - (a.raw - a.rounded)); // largest fractional remainder first
+  let i = 0;
+  while (diff !== 0 && scaled.length) {
+    const target = scaled[i % scaled.length];
+    if (!(diff < 0 && target.rounded <= 1)) { // never prorate an active player down to 0/negative
+      target.rounded += diff > 0 ? 1 : -1;
+      diff += diff > 0 ? -1 : 1;
+    }
+    i++;
+    if (i > scaled.length * 4) break; // safety valve — shouldn't happen, but never hang
+  }
+  scaled.forEach(x => { x.r.el.querySelector('.ql-minutes').value = Math.max(1, x.rounded); });
+  renderQuickLogValidation();
+  showToast('Minutes prorated to fit the full game exactly');
+}
+
 function buildQuickLogPayload() {
   const team = TEAMS[quickLogTeamKey];
-  const rows = document.querySelectorAll('#quickLogPlayerRows .quick-log-row');
+  const rows = readQuickLogRows();
   const stints = [];
   const events = [];
-  rows.forEach(row => {
-    const name = row.getAttribute('data-player-name');
-    const minutes = Number(row.querySelector('.ql-minutes').value) || 0;
-    const goalsFor = Number(row.querySelector('.ql-gf').value) || 0;
-    const goalsAgainst = Number(row.querySelector('.ql-ga').value) || 0;
-    const goals = Number(row.querySelector('.ql-goals').value) || 0;
-    const assists = Number(row.querySelector('.ql-assists').value) || 0;
-    const yellows = Number(row.querySelector('.ql-yellows').value) || 0;
-    const reds = Number(row.querySelector('.ql-reds').value) || 0;
-    if (!minutes && !goalsFor && !goalsAgainst && !goals && !assists && !yellows && !reds) return; // didn't play — skip
-    stints.push({ player_name: name, position: null, minutes, goals_for: goalsFor, goals_against: goalsAgainst });
-    for (let i = 0; i < goals; i++) events.push({ player_name: name, event_type: 'goal', goal_type: null });
-    for (let i = 0; i < assists; i++) events.push({ player_name: name, event_type: 'assist', goal_type: null });
-    for (let i = 0; i < yellows; i++) events.push({ player_name: name, event_type: 'yellow', goal_type: null });
-    for (let i = 0; i < reds; i++) events.push({ player_name: name, event_type: 'red', goal_type: null });
+  rows.forEach(r => {
+    const totalGoals = r.goalsR + r.goalsFK + r.goalsPK + r.goalsOT;
+    const played = r.minutes || r.goalsFor || r.goalsAgainst || totalGoals || r.assists || r.yellows || r.reds;
+    if (!played) return; // didn't play — skip
+    stints.push({ player_name: r.name, position: null, minutes: r.minutes, goals_for: r.goalsFor, goals_against: r.goalsAgainst });
+    for (let i = 0; i < r.goalsR; i++) events.push({ player_name: r.name, event_type: 'goal', goal_type: 'R' });
+    for (let i = 0; i < r.goalsFK; i++) events.push({ player_name: r.name, event_type: 'goal', goal_type: 'FK' });
+    for (let i = 0; i < r.goalsPK; i++) events.push({ player_name: r.name, event_type: 'goal', goal_type: 'PK' });
+    for (let i = 0; i < r.goalsOT; i++) events.push({ player_name: r.name, event_type: 'goal', goal_type: 'OT' });
+    for (let i = 0; i < r.assists; i++) events.push({ player_name: r.name, event_type: 'assist', goal_type: null });
+    for (let i = 0; i < r.yellows; i++) events.push({ player_name: r.name, event_type: 'yellow', goal_type: null });
+    for (let i = 0; i < r.reds; i++) events.push({ player_name: r.name, event_type: 'red', goal_type: null });
   });
 
   return {
@@ -1338,6 +1461,21 @@ function buildQuickLogPayload() {
   };
 }
 
+function quickLogMismatchSummary() {
+  const rows = readQuickLogRows();
+  const { onField, fullGameMin } = quickLogExpectedOnField();
+  const oppGoals = Number(document.getElementById('quickLogOppGoalsInput').value) || 0;
+  const totalMinutes = rows.reduce((s, r) => s + r.minutes, 0);
+  const totalGF = rows.reduce((s, r) => s + r.goalsFor, 0);
+  const totalGA = rows.reduce((s, r) => s + r.goalsAgainst, 0);
+  const regularGoals = rows.reduce((s, r) => s + r.goalsR + r.goalsFK + r.goalsPK, 0);
+  const problems = [];
+  if (totalMinutes !== fullGameMin * onField) problems.push('minutes');
+  if (totalGF !== regularGoals * onField) problems.push('goals for');
+  if (totalGA !== oppGoals * onField) problems.push('goals against');
+  return problems;
+}
+
 async function saveQuickLoggedGame() {
   if (!quickLogTeamKey) { showToast('Pick a team first'); return; }
   const opponent = document.getElementById('quickLogOpponentInput').value.trim();
@@ -1345,6 +1483,7 @@ async function saveQuickLoggedGame() {
   const payload = buildQuickLogPayload();
   if (!payload.stints.length) { showToast('Enter stats for at least one player'); return; }
   rememberOpponent(opponent);
+  const mismatches = quickLogMismatchSummary();
 
   if (!supabaseClient) {
     cachePendingGame(payload);
@@ -1352,7 +1491,9 @@ async function saveQuickLoggedGame() {
   } else {
     try {
       await pushGamePayload(payload);
-      showToast('Game logged to season history');
+      showToast(mismatches.length
+        ? `Saved (heads up: ${mismatches.join(' and ')} didn't add up exactly)`
+        : 'Game logged to season history');
     } catch (e) {
       cachePendingGame(payload);
       showToast('Couldn’t reach Supabase — saved locally, will retry automatically.');
@@ -1362,6 +1503,7 @@ async function saveQuickLoggedGame() {
   // Reset per-player fields but keep team/date/format selected so logging
   // several past games back-to-back doesn't require re-picking the team each time.
   document.getElementById('quickLogOpponentInput').value = '';
+  document.getElementById('quickLogOppGoalsInput').value = '0';
   renderQuickLogPlayerRows();
   renderQuickLogSaveState();
 }
@@ -2159,7 +2301,7 @@ function finishGoal(type) {
   p.goals += 1;
   goalEvents.push({ t: elapsed, playerId: p.id, type });
   matchGoals.push({ t: elapsed, side: 'us' });
-  const typeLabel = type === 'PK' ? 'PK' : type === 'FK' ? 'free kick' : 'run of play';
+  const typeLabel = type === 'PK' ? 'PK' : type === 'FK' ? 'free kick' : type === 'OT' ? 'OT/shootout' : 'run of play';
   addEvent(`⚽ Goal (${typeLabel}) — ${tag(p)} (${fmt(elapsed)})`, '⚽');
   showToast(`Goal logged for ${p.name} (${typeLabel})`);
   closeModal();
