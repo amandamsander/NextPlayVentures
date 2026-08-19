@@ -156,6 +156,19 @@
   }
   .row-remove-btn:hover { border-color: var(--card-red, #e34948); color: var(--card-red, #e34948); }
 
+  .quick-log-head-row, .quick-log-row {
+    display: grid;
+    grid-template-columns: 1.6fr repeat(7, 0.7fr);
+    gap: 6px; align-items: center;
+  }
+  .quick-log-head-row {
+    font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em;
+    margin-bottom: 6px; padding: 0 2px;
+  }
+  .quick-log-row { margin-bottom: 6px; }
+  .quick-log-row .qname { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .quick-log-row input.text-input { text-align: center; padding: 8px 4px; font-size: 13px; }
+
   .start-btn {
     font-family: var(--font-heading);
     width: 100%; padding: 14px; border-radius: 12px; border: none;
@@ -508,6 +521,12 @@
             <div class="t2">Slice minutes, goals, assists &amp; cards across every saved game — by player, team, opponent, or game type.</div>
           </div>
         </div>
+        <div class="choice-btn" onclick="goToQuickLog()" style="cursor:pointer;">
+          <div>
+            <div class="t1">🕘 Log a past game</div>
+            <div class="t2">Already happened? Enter final per-player stats directly — no live stopwatch needed.</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -527,6 +546,13 @@
           <input type="text" class="text-input" id="editorTeamName" placeholder="e.g. LFA 2014/15G GA Blue" oninput="renameCurrentTeam()">
         </div>
       </div>
+      <div class="field-row" style="margin-top:10px;">
+        <div class="field-col">
+          <span class="field-label">Team passcode</span>
+          <input type="text" class="text-input" id="editorTeamPin" placeholder="e.g. 2627" oninput="updateEditorPin()">
+        </div>
+      </div>
+      <div class="roster-note">Required to start a game, log a past game, or edit this roster. Leave blank for no passcode.</div>
     </div>
 
     <div class="setup-card">
@@ -536,6 +562,73 @@
     </div>
 
     <button class="start-btn" onclick="finishEditingTeam()">Done — save &amp; go back</button>
+  </div>
+
+  <!-- ================= QUICK LOG (PAST GAME) SCREEN ================= -->
+  <div id="quickLogScreen" style="display:none;">
+    <button class="change-setup-btn" onclick="goToMode()" style="margin: 0 0 8px 4px;">← Back</button>
+
+    <div class="setup-card">
+      <h2>1. Team</h2>
+      <div class="choice-grid" id="quickLogTeamChoices"></div>
+    </div>
+
+    <div class="setup-card">
+      <h2>2. Game info</h2>
+      <div class="field-row" style="margin-bottom:10px;">
+        <div class="field-col">
+          <span class="field-label">Opponent</span>
+          <input type="text" class="text-input" id="quickLogOpponentInput" list="opponentDatalist" placeholder="Type or pick an opponent" oninput="renderQuickLogSaveState()">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field-col">
+          <span class="field-label">Date</span>
+          <input type="date" class="text-input" id="quickLogDateInput">
+        </div>
+        <div class="field-col">
+          <span class="field-label">Game type</span>
+          <select class="select-input" id="quickLogGameTypeInput">
+            <option value="F">Friendly</option>
+            <option value="L">League</option>
+            <option value="T">Tournament</option>
+            <option value="S">Showcase</option>
+            <option value="W">Winter</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row" style="margin-top:10px;">
+        <div class="field-col">
+          <span class="field-label">Format</span>
+          <select class="select-input" id="quickLogFormatInput">
+            <option value="7v7">7v7</option>
+            <option value="9v9">9v9</option>
+            <option value="11v11">11v11</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-card">
+      <div class="setup-card-head">
+        <h2>3. Per-player stats</h2>
+      </div>
+      <div class="hint">Enter final totals for each player who played — leave a player at all zeros if they didn't play (they'll just be skipped).</div>
+      <div class="quick-log-head-row">
+        <div>Player</div>
+        <div>Min</div>
+        <div>GF*</div>
+        <div>GA*</div>
+        <div>G</div>
+        <div>A</div>
+        <div>🟨</div>
+        <div>🟥</div>
+      </div>
+      <div id="quickLogPlayerRows"></div>
+      <div class="hint" style="margin-top:8px;">*GF/GA = team goals scored/allowed while this player was on the field (optional — leave 0 if unsure).</div>
+    </div>
+
+    <button class="start-btn" id="quickLogSaveBtn" onclick="saveQuickLoggedGame()">💾 Save this game</button>
   </div>
 
   <!-- ================= SEASON STATS SCREEN ================= -->
@@ -748,6 +841,17 @@
   </div>
 </div>
 
+<!-- Team passcode modal -->
+<div class="modal-backdrop" id="pinModal">
+  <div class="modal-sheet">
+    <button class="modal-close" onclick="cancelPinModal()">✕</button>
+    <h3>Enter passcode</h3>
+    <div class="modal-hint" id="pinModalHint">Passcode required for <span id="pinModalTeamName">this team</span>.</div>
+    <input type="password" inputmode="numeric" class="text-input" id="pinInput" placeholder="Passcode" style="margin-bottom:12px;" onkeydown="if(event.key==='Enter') submitPin();">
+    <button class="start-btn" onclick="submitPin()">Unlock</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -810,32 +914,50 @@ const FORMATS = {
 const DEFAULT_TEAMS = {
   bluestar: {
     label: 'LFA 2015/16B Blue Star',
+    pin: '2627',
     roster: ['Case','Conor','Dallas','Enzo','Eston','Francis','Harrison','Hudson','Jack R','Jack S','Jaden','Nya','Omar']
       .map(name => ({ name, num: '' }))
   },
   gold: {
     label: 'LFA 2012/13G GA Gold',
+    pin: '2627',
     roster: ['Liv','Aria','Esme','PJ','Kate B','Izzy B','Grace','Olivia','Ellie','Addie','Betsy','Izzy S','Maggie','Kate R','Chelsea','Misha']
       .map(name => ({ name, num: '' }))
   },
   white: {
     label: 'LFA 2011/12G GA White',
+    pin: '2627',
     roster: ['Addie','Alaina','Alayna','Aliya','Blair','Brooklyn','Canyon','Carolina','Celeste','Emma','Emmalyn','Frankie','Hailey','Hattie','Izzy','Kailynn','Mya','Sophia']
       .map(name => ({ name, num: '' }))
   }
 };
 
 const TEAMS_STORAGE_KEY = 'sst_teams_v1';
+let teamsPinMigrationPending = false;
 
 function loadTeams() {
+  let teams;
   try {
     const raw = localStorage.getItem(TEAMS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object' && Object.keys(parsed).length) return parsed;
+      if (parsed && typeof parsed === 'object' && Object.keys(parsed).length) teams = parsed;
     }
   } catch (e) { /* storage unavailable — fall back to defaults for this session */ }
-  return JSON.parse(JSON.stringify(DEFAULT_TEAMS));
+  if (!teams) teams = JSON.parse(JSON.stringify(DEFAULT_TEAMS));
+
+  // One-time migration: teams saved before passcodes existed have no `pin`
+  // field yet. Default those to 2627 (per her request) so every existing
+  // team is protected the moment this update lands, on every device.
+  let migrated = false;
+  Object.values(teams).forEach(t => {
+    if (t.pin === undefined) { t.pin = '2627'; migrated = true; }
+  });
+  if (migrated) {
+    try { localStorage.setItem(TEAMS_STORAGE_KEY, JSON.stringify(teams)); } catch (e) { /* ignore */ }
+    teamsPinMigrationPending = true;
+  }
+  return teams;
 }
 
 function saveTeams() {
@@ -890,6 +1012,48 @@ function rememberOpponent(name) {
 }
 
 let TEAMS = loadTeams();
+
+/* ---------------- Team passcode gate ----------------
+   A soft deterrent, not real security — the check runs client-side, so
+   anyone with dev tools could bypass it. Good enough to stop the wrong
+   kid/parent from accidentally entering data for the wrong team, which is
+   the actual problem this solves. Unlocking a team lasts for the rest of
+   this browser session (resets on reload), so logging several games back
+   to back doesn't mean re-entering the code every time. */
+let unlockedTeams = new Set();
+let pendingPinUnlock = null;
+
+function requireTeamPin(teamKey, onUnlock) {
+  const team = TEAMS[teamKey];
+  if (!team || !team.pin) { onUnlock(); return; }
+  if (unlockedTeams.has(teamKey)) { onUnlock(); return; }
+  pendingPinUnlock = { teamKey, onUnlock };
+  document.getElementById('pinModalTeamName').textContent = team.label || 'this team';
+  document.getElementById('pinInput').value = '';
+  document.getElementById('pinModal').classList.add('open');
+  setTimeout(() => { const el = document.getElementById('pinInput'); if (el) el.focus(); }, 50);
+}
+
+function submitPin() {
+  if (!pendingPinUnlock) return;
+  const entered = document.getElementById('pinInput').value.trim();
+  const team = TEAMS[pendingPinUnlock.teamKey];
+  if (team && entered && entered === team.pin) {
+    unlockedTeams.add(pendingPinUnlock.teamKey);
+    const cb = pendingPinUnlock.onUnlock;
+    pendingPinUnlock = null;
+    closeModal();
+    cb();
+  } else {
+    showToast('Incorrect passcode');
+    document.getElementById('pinInput').value = '';
+  }
+}
+
+function cancelPinModal() {
+  pendingPinUnlock = null;
+  closeModal();
+}
 
 function numDisp(p) {
   return (p && p.num !== undefined && String(p.num).trim() !== '') ? p.num : '–';
@@ -1060,6 +1224,148 @@ async function flushPendingGames() {
   }
 }
 
+/* ---------------- Quick log a past game (no live stopwatch) ----------------
+   Same games/stints/player_events shape as buildGamePayload()/pushGamePayload(),
+   just built directly from typed-in totals instead of a tracked match. */
+let quickLogTeamKey = null;
+
+function goToQuickLog() {
+  hideAllScreens();
+  document.getElementById('quickLogScreen').style.display = 'block';
+  document.getElementById('headerTitle').textContent = 'Log a past game';
+  document.getElementById('headerSub').textContent = 'Enter final stats directly — for games already played';
+  quickLogTeamKey = null;
+  document.getElementById('quickLogOpponentInput').value = '';
+  document.getElementById('quickLogDateInput').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('quickLogGameTypeInput').value = 'F';
+  document.getElementById('quickLogFormatInput').value = '9v9';
+  renderQuickLogTeamChoices();
+  renderQuickLogPlayerRows();
+  renderQuickLogSaveState();
+}
+
+function renderQuickLogTeamChoices() {
+  const el = document.getElementById('quickLogTeamChoices');
+  const entries = Object.entries(TEAMS);
+  if (entries.length === 0) {
+    el.innerHTML = '<div class="log-empty">No teams saved yet — go back and create one first.</div>';
+    return;
+  }
+  el.innerHTML = entries.map(([key, t]) => `
+    <div class="choice-btn ${quickLogTeamKey === key ? 'selected' : ''}" onclick="selectQuickLogTeam('${key}')">
+      <div>
+        <div class="t1">${escapeAttr(t.label)}</div>
+        <div class="t2">${t.roster.length} players saved</div>
+      </div>
+      <div class="check"></div>
+    </div>
+  `).join('');
+}
+
+function selectQuickLogTeam(key) {
+  requireTeamPin(key, () => {
+    quickLogTeamKey = key;
+    renderQuickLogTeamChoices();
+    renderQuickLogPlayerRows();
+    renderQuickLogSaveState();
+  });
+}
+
+function renderQuickLogPlayerRows() {
+  const el = document.getElementById('quickLogPlayerRows');
+  if (!quickLogTeamKey || !TEAMS[quickLogTeamKey]) {
+    el.innerHTML = '<div class="log-empty">Pick a team above to list its roster.</div>';
+    return;
+  }
+  const roster = TEAMS[quickLogTeamKey].roster || [];
+  if (!roster.length) {
+    el.innerHTML = '<div class="log-empty">This team has no players saved yet.</div>';
+    return;
+  }
+  el.innerHTML = roster.map((p, i) => `
+    <div class="quick-log-row" data-player-name="${escapeAttr(p.name)}">
+      <div class="qname">${escapeAttr(p.name)}${p.num ? ' #' + escapeAttr(p.num) : ''}</div>
+      <input type="number" class="text-input ql-minutes" min="0" value="0">
+      <input type="number" class="text-input ql-gf" min="0" value="0">
+      <input type="number" class="text-input ql-ga" min="0" value="0">
+      <input type="number" class="text-input ql-goals" min="0" value="0">
+      <input type="number" class="text-input ql-assists" min="0" value="0">
+      <input type="number" class="text-input ql-yellows" min="0" value="0">
+      <input type="number" class="text-input ql-reds" min="0" value="0">
+    </div>
+  `).join('');
+}
+
+function renderQuickLogSaveState() {
+  const opponent = document.getElementById('quickLogOpponentInput').value.trim();
+  const btn = document.getElementById('quickLogSaveBtn');
+  btn.disabled = !(quickLogTeamKey && opponent);
+}
+
+function buildQuickLogPayload() {
+  const team = TEAMS[quickLogTeamKey];
+  const rows = document.querySelectorAll('#quickLogPlayerRows .quick-log-row');
+  const stints = [];
+  const events = [];
+  rows.forEach(row => {
+    const name = row.getAttribute('data-player-name');
+    const minutes = Number(row.querySelector('.ql-minutes').value) || 0;
+    const goalsFor = Number(row.querySelector('.ql-gf').value) || 0;
+    const goalsAgainst = Number(row.querySelector('.ql-ga').value) || 0;
+    const goals = Number(row.querySelector('.ql-goals').value) || 0;
+    const assists = Number(row.querySelector('.ql-assists').value) || 0;
+    const yellows = Number(row.querySelector('.ql-yellows').value) || 0;
+    const reds = Number(row.querySelector('.ql-reds').value) || 0;
+    if (!minutes && !goalsFor && !goalsAgainst && !goals && !assists && !yellows && !reds) return; // didn't play — skip
+    stints.push({ player_name: name, position: null, minutes, goals_for: goalsFor, goals_against: goalsAgainst });
+    for (let i = 0; i < goals; i++) events.push({ player_name: name, event_type: 'goal', goal_type: null });
+    for (let i = 0; i < assists; i++) events.push({ player_name: name, event_type: 'assist', goal_type: null });
+    for (let i = 0; i < yellows; i++) events.push({ player_name: name, event_type: 'yellow', goal_type: null });
+    for (let i = 0; i < reds; i++) events.push({ player_name: name, event_type: 'red', goal_type: null });
+  });
+
+  return {
+    game: {
+      team_id: quickLogTeamKey,
+      team_label: team.label,
+      opponent: document.getElementById('quickLogOpponentInput').value.trim(),
+      game_date: document.getElementById('quickLogDateInput').value || new Date().toISOString().slice(0, 10),
+      game_type: document.getElementById('quickLogGameTypeInput').value,
+      format: document.getElementById('quickLogFormatInput').value
+    },
+    stints,
+    events
+  };
+}
+
+async function saveQuickLoggedGame() {
+  if (!quickLogTeamKey) { showToast('Pick a team first'); return; }
+  const opponent = document.getElementById('quickLogOpponentInput').value.trim();
+  if (!opponent) { showToast('Enter an opponent'); return; }
+  const payload = buildQuickLogPayload();
+  if (!payload.stints.length) { showToast('Enter stats for at least one player'); return; }
+  rememberOpponent(opponent);
+
+  if (!supabaseClient) {
+    cachePendingGame(payload);
+    showToast('Saved on this device — will sync to season stats once connected.');
+  } else {
+    try {
+      await pushGamePayload(payload);
+      showToast('Game logged to season history');
+    } catch (e) {
+      cachePendingGame(payload);
+      showToast('Couldn’t reach Supabase — saved locally, will retry automatically.');
+    }
+  }
+
+  // Reset per-player fields but keep team/date/format selected so logging
+  // several past games back-to-back doesn't require re-picking the team each time.
+  document.getElementById('quickLogOpponentInput').value = '';
+  renderQuickLogPlayerRows();
+  renderQuickLogSaveState();
+}
+
 // Best-effort roster/opponent sync — never blocks the UI, fails silently.
 // The local copy (localStorage) always stays the source of truth for this device.
 function syncTeamsToSupabase() {
@@ -1068,7 +1374,7 @@ function syncTeamsToSupabase() {
     if (!t.label || !t.label.trim()) return;
     const updatedAt = t.updatedAt || Date.now();
     supabaseClient.from('teams').upsert({
-      id, label: t.label, roster: t.roster, updated_at: new Date(updatedAt).toISOString()
+      id, label: t.label, roster: t.roster, pin: t.pin || '', updated_at: new Date(updatedAt).toISOString()
     }).then(() => {}).catch(() => {});
   });
 }
@@ -1095,7 +1401,12 @@ async function pullTeamsAndOpponentsFromSupabase() {
       const remoteTime = remote.updated_at ? new Date(remote.updated_at).getTime() : 0;
       const localTime = (local && local.updatedAt) || 0;
       if (!local || remoteTime > localTime) {
-        TEAMS[remote.id] = { label: remote.label, roster: remote.roster || [], updatedAt: remoteTime };
+        // Remote might predate the passcode column (older row, or she hasn't
+        // run the one-time ALTER TABLE yet) — don't let that null out a pin
+        // we already have locally.
+        const pin = (remote.pin !== undefined && remote.pin !== null && remote.pin !== '')
+          ? remote.pin : ((local && local.pin) || '');
+        TEAMS[remote.id] = { label: remote.label, roster: remote.roster || [], updatedAt: remoteTime, pin };
         changed = true;
       }
     });
@@ -1273,7 +1584,7 @@ function showStatsTab(tab) {
 
 /* ---------------- Screen navigation ---------------- */
 function hideAllScreens() {
-  ['modeScreen','rosterEditorScreen','setupScreen','trackerScreen','statsScreen'].forEach(id => {
+  ['modeScreen','rosterEditorScreen','setupScreen','trackerScreen','statsScreen','quickLogScreen'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
 }
@@ -1299,6 +1610,14 @@ let editorCurrentKey = null;
 
 function goToRosterEditor(teamKey, returnTo) {
   cleanupBlankTeam();
+  if (teamKey && TEAMS[teamKey]) {
+    requireTeamPin(teamKey, () => _enterRosterEditor(teamKey, returnTo));
+  } else {
+    _enterRosterEditor(teamKey, returnTo);
+  }
+}
+
+function _enterRosterEditor(teamKey, returnTo) {
   hideAllScreens();
   document.getElementById('rosterEditorScreen').style.display = 'block';
   document.getElementById('headerTitle').textContent = 'Manage teams';
@@ -1336,8 +1655,14 @@ function renderRosterEditor() {
   const t = TEAMS[editorCurrentKey];
   document.getElementById('rosterEditorTitle').textContent = t.label ? 'Edit team' : 'New team';
   document.getElementById('editorTeamName').value = t.label;
+  document.getElementById('editorTeamPin').value = t.pin || '';
   renderEditorTeamChips();
   renderEditorPlayerRows();
+}
+
+function updateEditorPin() {
+  TEAMS[editorCurrentKey].pin = document.getElementById('editorTeamPin').value.trim();
+  saveTeams();
 }
 
 function renderEditorTeamChips() {
@@ -1501,11 +1826,16 @@ renderOpponentDatalist();
 initSupabaseClient();
 flushPendingGames();
 syncRostersOnConnect();
+if (teamsPinMigrationPending) { syncTeamsToSupabase(); teamsPinMigrationPending = false; }
 goToMode();
 
 /* ---------------- Start match ---------------- */
 function startMatch() {
   if (!selectedTeamKey || !selectedFormatKey) return;
+  requireTeamPin(selectedTeamKey, _startMatch);
+}
+
+function _startMatch() {
   matchOpponent = document.getElementById('opponentInput').value.trim() || 'Opponent TBD';
   rememberOpponent(matchOpponent);
   matchDate = document.getElementById('dateInput').value || new Date().toISOString().slice(0,10);
@@ -1863,6 +2193,7 @@ function closeModal() {
   document.getElementById('subModal').classList.remove('open');
   document.getElementById('actionModal').classList.remove('open');
   document.getElementById('goalTypeModal').classList.remove('open');
+  document.getElementById('pinModal').classList.remove('open');
 }
 
 function showToast(msg) {
