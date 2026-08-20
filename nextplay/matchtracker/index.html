@@ -2,8 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Sideline — Match Stat Tracker Prototype</title>
+
+<!-- Installable home-screen app support -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B2A4A">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Match Tracker">
+<meta name="mobile-web-app-capable" content="yes">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
@@ -138,6 +148,10 @@
   }
   .text-input:focus, .select-input:focus { outline: none; border-color: var(--accent); }
   .text-input::placeholder { color: var(--muted); }
+  /* Native <select> dropdown lists are rendered by the OS/browser, not by our
+     dark theme — without this, options inherit the select's white text on the
+     browser's default white list background and become unreadable. */
+  .select-input option { color: #14213D; background: #FFFFFF; }
 
   .roster-note {
     font-size: 11px; color: var(--muted); margin-top: 10px; line-height: 1.5;
@@ -213,6 +227,19 @@
     letter-spacing: -0.02em;
   }
   .clock-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .clock-countdown { font-size: 12px; color: var(--text-secondary); margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .clock-countdown.stoppage { color: var(--card-red); font-weight: 700; }
+
+  .score-card {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    background: var(--surface-1); border-radius: 14px; border: 1px solid var(--border);
+    padding: 10px 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  }
+  .score-team { font-size: 11px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; flex: 1; text-align: center; }
+  .score-value {
+    font-family: var(--font-heading); color: var(--accent); font-size: 22px; font-weight: 800;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.01em; flex-shrink: 0;
+  }
   .clock-controls { display: flex; gap: 8px; }
   button.icon-btn {
     border: none; border-radius: 10px; padding: 10px 14px;
@@ -257,6 +284,21 @@
     margin-bottom: 12px;
   }
   .opp-goal-btn:hover { background: rgba(208,59,59,0.12); }
+
+  .own-goal-btn {
+    width: 100%; padding: 10px; border-radius: 10px; border: 1.5px dashed var(--accent);
+    background: var(--surface-raised); color: var(--accent); font-weight: 700; font-size: 12.5px; cursor: pointer;
+    margin-bottom: 12px;
+  }
+  .own-goal-btn:hover { background: var(--accent-tint); }
+
+  .undo-btn {
+    width: 100%; padding: 10px; border-radius: 10px; border: 1.5px dashed var(--text-secondary);
+    background: var(--surface-raised); color: var(--text-secondary); font-weight: 700; font-size: 12.5px; cursor: pointer;
+    margin-bottom: 12px;
+  }
+  .undo-btn:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: var(--text-primary); border-color: var(--text-primary); }
+  .undo-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* ---------- Section headers ---------- */
   h2.section-title {
@@ -518,6 +560,16 @@
     border-top: 1px solid var(--gridline); padding-top: 10px;
   }
   .stat-player-grid > div { text-align: center; }
+
+  /* ---------- Team record (Season Stats) ---------- */
+  .team-record-card {
+    background: var(--surface-1); border: 1.5px solid var(--gridline); border-radius: 12px;
+    padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .team-record-name { font-family: var(--font-heading); font-weight: 700; font-size: 13.5px; }
+  .team-record-line { text-align: right; }
+  .team-record-wld { font-family: var(--font-heading); font-weight: 800; font-size: 16px; color: var(--accent); }
+  .team-record-meta { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
   .stat-player-grid label {
     display: block; font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em;
     color: var(--muted); margin-bottom: 2px;
@@ -677,6 +729,10 @@
       </div>
       <div class="field-row" style="margin-top:10px;">
         <div class="field-col">
+          <span class="field-label">Own goals (opponent scored on themselves — goals for us)</span>
+          <input type="number" class="text-input" id="quickLogOwnGoalsInput" min="0" value="0" oninput="renderQuickLogValidation()">
+        </div>
+        <div class="field-col">
           <span class="field-label">Opponent's national ranking (optional)</span>
           <input type="number" class="text-input" id="quickLogOpponentRankInput" min="1" placeholder="e.g. 42 — leave blank if unknown">
         </div>
@@ -687,13 +743,13 @@
       <div class="setup-card-head">
         <h2>3. Per-player stats</h2>
       </div>
-      <div class="hint">Enter final totals for each player who played — leave a player at all zeros if they didn't play (they'll just be skipped). Goals are split by how they were scored; OT/PK is for a penalty shootout after the final whistle — those don't count toward on-field minutes or goals.</div>
+      <div class="hint">Enter final totals for each player who played — leave a player at all zeros if they didn't play (they'll just be skipped). Goals are split by how they were scored; OT/PK is for a penalty shootout after the final whistle — those don't count toward on-field minutes or goals. Own goals (entered above) don't belong to any player — just make sure each on-field player's individual "GF" total still adds up to include them (see the checklist below).</div>
       <div id="quickLogPlayerRows"></div>
     </div>
 
     <div class="setup-card">
       <h2>4. Does it add up?</h2>
-      <div class="hint">Regular-time on-field math: minutes should total the full game length × players on the field; goals-for/against should total (team goals scored/allowed) × players on the field for each one — same girls can count for more than one goal. OT/PK goals are tracked but excluded from these checks since no one's "on the field" for a shootout in the usual sense.</div>
+      <div class="hint">Regular-time on-field math: minutes should total the full game length × players on the field; goals-for/against should total (team goals scored/allowed, including any own goals) × players on the field for each one — same girls can count for more than one goal. OT/PK goals are tracked but excluded from these checks since no one's "on the field" for a shootout in the usual sense.</div>
       <div id="quickLogValidation"></div>
       <button class="export-btn" onclick="prorateQuickLogMinutes()">⚖️ Auto-prorate minutes to fit exactly</button>
     </div>
@@ -736,6 +792,13 @@
           </div>
         </div>
         <div class="roster-note" id="filterSummary"></div>
+      </div>
+
+      <div class="setup-card">
+        <div class="setup-card-head">
+          <h2>Team record</h2>
+        </div>
+        <div id="teamRecordResults"></div>
       </div>
 
       <div class="summary-card">
@@ -818,14 +881,22 @@
   <div id="trackerScreen">
 
     <div class="match-meta-bar">
+      <button class="change-setup-btn" onclick="backToModeFromTracker()">← Back</button>
       <div><b id="metaTeam"></b> vs <b id="metaOpponent"></b> · <span id="metaFormat"></span></div>
       <button class="change-setup-btn" onclick="backToSetup()">Change</button>
+    </div>
+
+    <div class="score-card">
+      <div class="score-team" id="scoreTeamLabel">Us</div>
+      <div class="score-value" id="scoreValue">0 – 0</div>
+      <div class="score-team" id="scoreOppLabel">Opponent</div>
     </div>
 
     <div class="clock-card">
       <div>
         <div class="clock-time" id="clockDisplay">00:00</div>
         <div class="clock-meta" id="clockMeta">Not started</div>
+        <div class="clock-countdown" id="clockCountdown"></div>
         <div class="half-pill-row">
           <button class="half-pill active" id="half1Btn" onclick="setHalf(1)">1st Half</button>
           <button class="half-pill" id="half2Btn" onclick="setHalf(2)">2nd Half</button>
@@ -843,7 +914,10 @@
     </div>
     <div class="control-hint">Until SUBS is clicked, tapping a player into a spot treats them as a starter (backdated to kickoff) — handy if you're a beat late setting the lineup. Once clicked, every change logs at the real clock time — click it again any time you make another round of subs, there's no limit per half. End half records the real length in case of stoppage time.</div>
 
+    <button class="undo-btn" id="undoActionBtn" onclick="undoLastAction()" disabled>↩ Undo last action</button>
+
     <button class="opp-goal-btn" onclick="openOpponentGoal()">🥅 Log opponent goal (goal against)</button>
+    <button class="own-goal-btn" onclick="openOwnGoalForUs()">⚽ Log own goal (opponent scored on themselves — goal for us)</button>
 
     <h2 class="section-title">On the field</h2>
     <div class="pitch-wrap">
@@ -1248,7 +1322,12 @@ function buildGamePayload() {
       game_date: matchDate || new Date().toISOString().slice(0, 10),
       game_type: gameType,
       format: selectedFormatKey,
-      opponent_national_rank: matchOpponentRank
+      opponent_national_rank: matchOpponentRank,
+      // Final score for the whole game (not per-stint) — drives the Team Record
+      // section in Season Stats. Own goals are already folded in here since
+      // they're logged into matchGoals with side:'us' just like any other goal.
+      team_goals_for: matchGoals.filter(g => g.side === 'us').length,
+      team_goals_against: matchGoals.filter(g => g.side === 'opponent').length
     },
     stints,
     events
@@ -1328,6 +1407,7 @@ function goToQuickLog() {
   document.getElementById('quickLogGameTypeInput').value = 'F';
   document.getElementById('quickLogFormatInput').value = '9v9';
   document.getElementById('quickLogOppGoalsInput').value = '0';
+  document.getElementById('quickLogOwnGoalsInput').value = '0';
   document.getElementById('quickLogOpponentRankInput').value = '';
   renderQuickLogTeamChoices();
   renderQuickLogPlayerRows();
@@ -1439,6 +1519,7 @@ function renderQuickLogValidation() {
   const rows = readQuickLogRows();
   const { onField, fullGameMin } = quickLogExpectedOnField();
   const oppGoals = Number(document.getElementById('quickLogOppGoalsInput').value) || 0;
+  const ownGoals = Number(document.getElementById('quickLogOwnGoalsInput').value) || 0;
 
   const totalMinutes = rows.reduce((s, r) => s + r.minutes, 0);
   const totalGF = rows.reduce((s, r) => s + r.goalsFor, 0);
@@ -1447,7 +1528,7 @@ function renderQuickLogValidation() {
   const otGoals = rows.reduce((s, r) => s + r.goalsOT, 0);
 
   const expectedMinutes = fullGameMin * onField;
-  const expectedGF = regularGoals * onField;
+  const expectedGF = (regularGoals + ownGoals) * onField;
   const expectedGA = oppGoals * onField;
 
   const row = (label, actual, expected, extraNote) => {
@@ -1460,7 +1541,7 @@ function renderQuickLogValidation() {
 
   el.innerHTML =
     row('Minutes', totalMinutes, expectedMinutes, `${fullGameMin}min × ${onField} on field`) +
-    row('Goals for (on field)', totalGF, expectedGF, `${regularGoals} goal${regularGoals === 1 ? '' : 's'} × ${onField} on field`) +
+    row('Goals for (on field)', totalGF, expectedGF, `${regularGoals} player goal${regularGoals === 1 ? '' : 's'}${ownGoals ? ` + ${ownGoals} own goal${ownGoals === 1 ? '' : 's'}` : ''} × ${onField} on field`) +
     row('Goals against (on field)', totalGA, expectedGA, `${oppGoals} opp. goal${oppGoals === 1 ? '' : 's'} × ${onField} on field`) +
     `<div class="ql-validation-row"><div class="ql-v-label">OT/PK goals (yours, excluded above)</div><div class="ql-v-value">${otGoals}</div></div>`;
 }
@@ -1516,6 +1597,12 @@ function buildQuickLogPayload() {
     for (let i = 0; i < r.reds; i++) events.push({ player_name: r.name, event_type: 'red', goal_type: null });
   });
 
+  // Final score (regular time) — regularGoals excludes OT/PK shootout goals,
+  // same convention as the on-field math checklist above.
+  const regularGoals = rows.reduce((s, r) => s + r.goalsR + r.goalsFK + r.goalsPK, 0);
+  const ownGoals = Number(document.getElementById('quickLogOwnGoalsInput').value) || 0;
+  const oppGoals = Number(document.getElementById('quickLogOppGoalsInput').value) || 0;
+
   return {
     game: {
       team_id: quickLogTeamKey,
@@ -1527,7 +1614,9 @@ function buildQuickLogPayload() {
       opponent_national_rank: (() => {
         const raw = document.getElementById('quickLogOpponentRankInput').value.trim();
         return raw ? Number(raw) : null;
-      })()
+      })(),
+      team_goals_for: regularGoals + ownGoals,
+      team_goals_against: oppGoals
     },
     stints,
     events
@@ -1538,13 +1627,14 @@ function quickLogMismatchSummary() {
   const rows = readQuickLogRows();
   const { onField, fullGameMin } = quickLogExpectedOnField();
   const oppGoals = Number(document.getElementById('quickLogOppGoalsInput').value) || 0;
+  const ownGoals = Number(document.getElementById('quickLogOwnGoalsInput').value) || 0;
   const totalMinutes = rows.reduce((s, r) => s + r.minutes, 0);
   const totalGF = rows.reduce((s, r) => s + r.goalsFor, 0);
   const totalGA = rows.reduce((s, r) => s + r.goalsAgainst, 0);
   const regularGoals = rows.reduce((s, r) => s + r.goalsR + r.goalsFK + r.goalsPK, 0);
   const problems = [];
   if (totalMinutes !== fullGameMin * onField) problems.push('minutes');
-  if (totalGF !== regularGoals * onField) problems.push('goals for');
+  if (totalGF !== (regularGoals + ownGoals) * onField) problems.push('goals for');
   if (totalGA !== oppGoals * onField) problems.push('goals against');
   return problems;
 }
@@ -1578,6 +1668,7 @@ async function saveQuickLoggedGame() {
   // Opponent, its goals, and its national rank reset too since those are specific to the game just saved.
   document.getElementById('quickLogOpponentInput').value = '';
   document.getElementById('quickLogOppGoalsInput').value = '0';
+  document.getElementById('quickLogOwnGoalsInput').value = '0';
   document.getElementById('quickLogOpponentRankInput').value = '';
   renderQuickLogPlayerRows();
   renderQuickLogSaveState();
@@ -1810,14 +1901,19 @@ function computePlayerGameRows(games, stints, events) {
   const rowMap = {};
   function ensure(gameId, name) {
     const k = gameId + '::' + name;
-    if (!rowMap[k]) rowMap[k] = { gameId, name, minutes: 0, goalsFor: 0, goalsAgainst: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+    if (!rowMap[k]) rowMap[k] = { gameId, name, minutes: 0, goalsFor: 0, goalsAgainst: 0, goals: 0, assists: 0, yellows: 0, reds: 0, positions: {} };
     return rowMap[k];
   }
   stints.forEach(s => {
     const r = ensure(s.game_id, s.player_name);
-    r.minutes += Number(s.minutes) || 0;
+    const mins = Number(s.minutes) || 0;
+    r.minutes += mins;
     r.goalsFor += Number(s.goals_for) || 0;
     r.goalsAgainst += Number(s.goals_against) || 0;
+    // Position is only captured for live-tracked games (quick-log/"log a past
+    // game" entries don't collect it) — stints without a position just don't
+    // contribute here, so the breakdown quietly reflects whatever's known.
+    if (s.position) r.positions[s.position] = (r.positions[s.position] || 0) + mins;
   });
   events.forEach(e => {
     const r = ensure(e.game_id, e.player_name);
@@ -1850,6 +1946,48 @@ const SORT_LABELS = {
   totalContributions: 'Total Goal Contributions'
 };
 
+// Team-level W-L-D record + goal differential, from each game's final score
+// (team_goals_for/against — captured starting v1.3; older games without a
+// score on file are counted but excluded from the record itself).
+function renderTeamRecords(games, matchingGameIds) {
+  const el = document.getElementById('teamRecordResults');
+  if (!el) return;
+  const gamesInScope = games.filter(g => matchingGameIds.has(g.id));
+  const hasScore = g => g.team_goals_for !== null && g.team_goals_for !== undefined
+    && g.team_goals_against !== null && g.team_goals_against !== undefined;
+
+  const byTeam = {};
+  gamesInScope.filter(hasScore).forEach(g => {
+    const t = byTeam[g.team_label] || (byTeam[g.team_label] = { label: g.team_label, w: 0, l: 0, d: 0, gf: 0, ga: 0, games: 0 });
+    t.games += 1;
+    t.gf += Number(g.team_goals_for);
+    t.ga += Number(g.team_goals_against);
+    if (g.team_goals_for > g.team_goals_against) t.w += 1;
+    else if (g.team_goals_for < g.team_goals_against) t.l += 1;
+    else t.d += 1;
+  });
+
+  const teams = Object.values(byTeam).sort((a, b) => b.games - a.games);
+  const missingCount = gamesInScope.length - gamesInScope.filter(hasScore).length;
+
+  if (!teams.length) {
+    el.innerHTML = '<div class="log-empty">No final scores on file yet for these filters — scores are captured automatically for games logged from v1.3 onward.</div>';
+    return;
+  }
+  el.innerHTML = teams.map(t => {
+    const diff = t.gf - t.ga;
+    return `
+      <div class="team-record-card">
+        <div class="team-record-name">${escapeAttr(t.label)}</div>
+        <div class="team-record-line">
+          <span class="team-record-wld">${t.w}-${t.l}-${t.d}</span>
+          <span class="team-record-meta">${t.games} game${t.games === 1 ? '' : 's'} · ${t.gf}–${t.ga} GF-GA · ${diff >= 0 ? '+' : ''}${diff} diff</span>
+        </div>
+      </div>
+    `;
+  }).join('') + (missingCount ? `<div class="roster-note">${missingCount} game${missingCount === 1 ? '' : 's'} in this filter ${missingCount === 1 ? "doesn't" : "don't"} have a final score on file (logged before v1.3) — excluded from the record above.</div>` : '');
+}
+
 function renderStatsResults() {
   if (!statsRawData) return;
   const { games, stints, events } = statsRawData;
@@ -1864,6 +2002,8 @@ function renderStatsResults() {
   document.getElementById('filterSummary').textContent =
     `${matchingGameIds.size} game${matchingGameIds.size === 1 ? '' : 's'} match${matchingGameIds.size === 1 ? 'es' : ''} these filters.`;
 
+  renderTeamRecords(games, matchingGameIds);
+
   // Difficulty scores are computed from each team's FULL season history (not the
   // filtered subset) — filters decide which games get averaged in, not what
   // "hardest opponent this team has faced" means.
@@ -1875,7 +2015,7 @@ function renderStatsResults() {
   const perPlayer = {};
   filteredRows.forEach(r => {
     if (!perPlayer[r.name]) {
-      perPlayer[r.name] = { name: r.name, totalMinutes: 0, gamesAppeared: 0, totalGoals: 0, totalAssists: 0, yellows: 0, reds: 0, weightedSum: 0 };
+      perPlayer[r.name] = { name: r.name, totalMinutes: 0, gamesAppeared: 0, totalGoals: 0, totalAssists: 0, yellows: 0, reds: 0, weightedSum: 0, positions: {} };
     }
     const p = perPlayer[r.name];
     p.totalMinutes += r.minutes;
@@ -1885,13 +2025,18 @@ function renderStatsResults() {
     p.yellows += r.yellows;
     p.reds += r.reds;
     p.weightedSum += r.weightedScore;
+    Object.entries(r.positions || {}).forEach(([pos, mins]) => {
+      p.positions[pos] = (p.positions[pos] || 0) + mins;
+    });
   });
 
   const rows = Object.values(perPlayer).map(p => ({
     ...p,
     avgMinutes: p.totalMinutes / p.gamesAppeared,
     totalContributions: p.totalGoals + p.totalAssists,
-    weighted: p.weightedSum / p.gamesAppeared
+    weighted: p.weightedSum / p.gamesAppeared,
+    positionSummary: Object.entries(p.positions).sort((a, b) => b[1] - a[1])
+      .slice(0, 2).map(([pos, mins]) => `${pos} ${mins}m`).join(', ')
   }));
 
   const sortBy = document.getElementById('statsSortInput').value || 'weighted';
@@ -1906,7 +2051,7 @@ function renderStatsResults() {
       <div class="stat-player-head">
         <div>
           <div class="stat-player-name">${escapeAttr(r.name)}</div>
-          <div class="stat-player-cards">${r.gamesAppeared} game${r.gamesAppeared === 1 ? '' : 's'}${r.yellows ? ' · 🟨' + r.yellows : ''}${r.reds ? ' · 🟥' + r.reds : ''}</div>
+          <div class="stat-player-cards">${r.gamesAppeared} game${r.gamesAppeared === 1 ? '' : 's'}${r.positionSummary ? ' · ' + escapeAttr(r.positionSummary) : ''}${r.yellows ? ' · 🟨' + r.yellows : ''}${r.reds ? ' · 🟥' + r.reds : ''}</div>
         </div>
         <div class="stat-player-primary">
           <div class="stat-player-primary-val">${primaryVal(r)}</div>
@@ -1925,7 +2070,7 @@ function renderStatsResults() {
   `).join('') : '<div class="log-empty">No games match these filters yet.</div>';
 
   document.getElementById('statsLegend').textContent =
-    'Weighted Score = per-game Offensive Effectiveness Score × Opponent Difficulty Score, averaged across games played. Opponent difficulty is scored 0–1 based on the toughest opponent that team has faced this season.';
+    'Weighted Score = per-game Offensive Effectiveness Score × Opponent Difficulty Score, averaged across games played. Opponent difficulty is scored 0–1 based on the toughest opponent that team has faced this season. Positions shown are minutes played at each spot, for games tracked live (position data isn\'t captured on manually logged games).';
 }
 
 /* ---------------- Screen navigation ---------------- */
@@ -2101,6 +2246,7 @@ let matchGoals = [];     // { t, side: 'us' | 'opponent' }
 let goalEvents = [];     // { t, playerId, type }
 let assistEvents = [];   // { t, playerId }
 let pendingGoalPlayerId = null;
+let actionStack = [];    // { label, undo: fn } — most-recent-first stack for "Undo last action"
 
 // Starting-lineup / subs-timing state
 let lineupLocked = false;        // false = still setting the starting lineup for this half (taps back-date to kickoff)
@@ -2176,6 +2322,15 @@ syncRostersOnConnect();
 if (teamsPinMigrationPending) { syncTeamsToSupabase(); teamsPinMigrationPending = false; }
 goToMode();
 
+// Registers the app-shell cache so this can be added to the home screen and
+// still launch offline. Requires a secure context (https, or localhost) —
+// silently skipped on file:// or plain http, so it never blocks anything.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* not on a secure origin — fine, app still works */ });
+  });
+}
+
 /* ---------------- Start match ---------------- */
 function startMatch() {
   if (!selectedTeamKey || !selectedFormatKey) return;
@@ -2203,7 +2358,7 @@ function _startMatch() {
   // everyone starts on the bench — tap an empty field slot to send a player in
 
   elapsed = 0; running = false; currentHalf = 1; events = [];
-  matchGoals = []; goalEvents = []; assistEvents = [];
+  matchGoals = []; goalEvents = []; assistEvents = []; actionStack = [];
   lineupLocked = false; currentHalfKickoffElapsed = 0;
   half1EndElapsed = null; half2StartElapsed = null; half2EndElapsed = null;
 
@@ -2219,6 +2374,14 @@ function _startMatch() {
   document.getElementById('playBtn').innerHTML = '▶ Start';
   setHalf(1, true);
   renderAll();
+}
+
+function backToModeFromTracker() {
+  const hasProgress = elapsed > 0 || (events && events.length > 0);
+  if (hasProgress && !confirm('Go back to the main menu? This game is still in progress — nothing gets deleted, but make sure you\'ve saved (End half / Save to season history) before leaving if you don\'t want to lose it.')) return;
+  if (running) toggleClock();
+  clearInterval(timerHandle);
+  goToMode();
 }
 
 function backToSetup() {
@@ -2239,12 +2402,49 @@ function fmt(s) {
   return `${m}:${sec}`;
 }
 
+// Same as fmt() but keeps a leading "-" for negative values — used for the
+// half countdown, which goes negative once a half runs into stoppage time.
+function fmtSigned(s) {
+  return (s < 0 ? '-' : '') + fmt(Math.abs(s));
+}
+
+// Live score, shown just below the team/opponent header — reflects every
+// goal for/against logged so far (including own goals, which count as a
+// goal for without an individual scorer).
+function updateScoreDisplay() {
+  const teamEl = document.getElementById('scoreTeamLabel');
+  const oppEl = document.getElementById('scoreOppLabel');
+  const valEl = document.getElementById('scoreValue');
+  if (!valEl) return;
+  const us = matchGoals.filter(g => g.side === 'us').length;
+  const opponent = matchGoals.filter(g => g.side === 'opponent').length;
+  if (teamEl) teamEl.textContent = (selectedTeamKey && TEAMS[selectedTeamKey]) ? TEAMS[selectedTeamKey].label : 'Us';
+  if (oppEl) oppEl.textContent = matchOpponent || 'Opponent';
+  valEl.textContent = `${us} – ${opponent}`;
+}
+
+// Countdown to the end of the current half, based on the format's standard
+// half length — goes negative (shown with a "-") once play runs past that
+// into stoppage time, so no one has to do the subtraction by hand.
+function updateCountdown() {
+  const el = document.getElementById('clockCountdown');
+  if (!el) return;
+  if (!selectedFormatKey || !FORMATS[selectedFormatKey]) { el.textContent = ''; return; }
+  const halfSeconds = FORMATS[selectedFormatKey].standardHalfMin * 60;
+  const elapsedInHalf = elapsed - currentHalfKickoffElapsed;
+  const remaining = halfSeconds - elapsedInHalf;
+  const halfLabel = currentHalf === 1 ? '1st half' : '2nd half';
+  el.textContent = `${fmtSigned(remaining)} left in ${halfLabel}`;
+  el.classList.toggle('stoppage', remaining < 0);
+}
+
 function toggleClock() {
   running = !running;
   document.getElementById('playBtn').innerHTML = running ? '⏸ Pause' : '▶ Start';
   document.getElementById('clockMeta').textContent = running
     ? `Half ${currentHalf} — running`
     : `Half ${currentHalf} — paused`;
+  updateCountdown();
   if (running) {
     timerHandle = setInterval(tick, 1000);
   } else {
@@ -2256,6 +2456,7 @@ function tick() {
   elapsed += 1;
   players.forEach(p => { if (p.position) p.seconds += 1; });
   document.getElementById('clockDisplay').textContent = fmt(elapsed);
+  updateCountdown();
   renderBench();
   renderPitch();
   renderSummary();
@@ -2271,6 +2472,7 @@ function setHalf(h, silent) {
   if (!silent) addEvent(`Kickoff — half ${h}`, '🏁');
   document.getElementById('clockMeta').textContent = running
     ? `Half ${currentHalf} — running` : `Half ${currentHalf} — paused`;
+  updateCountdown();
   updateSubsButton();
 }
 
@@ -2294,6 +2496,10 @@ function unlockSubs() {
 }
 
 function endHalf() {
+  const confirmMsg = currentHalf === 1
+    ? `End the 1st half? This locks in ${fmt(elapsed)} on the clock and starts the 2nd half. This can't be undone from here — if this was an accidental tap, just cancel and keep going.`
+    : `End the game? This locks in ${fmt(elapsed)} on the clock as full time and saves the game to season history.`;
+  if (!confirm(confirmMsg)) return;
   if (currentHalf === 1) {
     half1EndElapsed = elapsed;
     if (running) toggleClock();
@@ -2313,7 +2519,7 @@ function endHalf() {
 function resetGame() {
   if (!confirm('Reset this game? This clears the clock, log, and all minutes/stats (roster stays loaded).')) return;
   elapsed = 0; running = false; currentHalf = 1; events = [];
-  matchGoals = []; goalEvents = []; assistEvents = [];
+  matchGoals = []; goalEvents = []; assistEvents = []; actionStack = [];
   lineupLocked = false; currentHalfKickoffElapsed = 0;
   half1EndElapsed = null; half2StartElapsed = null; half2EndElapsed = null;
   clearInterval(timerHandle);
@@ -2388,6 +2594,38 @@ function addEvent(text, icon) {
   events.unshift({ t: elapsed, text, icon });
   renderLog();
 }
+
+/* ---------------- Undo (single-step, for a mis-tap during live tracking) ----------------
+   Every action that logs a goal/assist/card/own-goal/opponent-goal/sub calls
+   pushUndo() right after it commits, handing back a closure that knows exactly
+   how to reverse THAT action (and only that action — the clock/elapsed time is
+   deliberately never touched by undo, since real time has kept moving). */
+function pushUndo(label, undoFn) {
+  actionStack.push({ label, undo: undoFn });
+  updateUndoButton();
+}
+
+function updateUndoButton() {
+  const btn = document.getElementById('undoActionBtn');
+  if (!btn) return;
+  if (actionStack.length) {
+    btn.disabled = false;
+    btn.textContent = `↩ Undo: ${actionStack[actionStack.length - 1].label}`;
+  } else {
+    btn.disabled = true;
+    btn.textContent = '↩ Undo last action';
+  }
+}
+
+function undoLastAction() {
+  if (!actionStack.length) return;
+  const last = actionStack[actionStack.length - 1];
+  if (!confirm(`Undo "${last.label}"? This only reverses that one action — nothing else changes.`)) return;
+  actionStack.pop();
+  last.undo();
+  renderAll();
+  showToast(`Undone: ${last.label}`);
+}
 function renderLog() {
   const list = document.getElementById('logList');
   if (events.length === 0) {
@@ -2459,22 +2697,36 @@ function doSwap(benchId, fieldId) {
   const pos = onField.position;
   const posLabel = POSITIONS.find(x=>x.id===pos).label;
 
+  let undoStintChange;
   if (lineupLocked) {
     // real substitution — close the outgoing player's stint at the current time
+    const openStint = onField.stints.find(s => s.checkOut === null);
     closeOpenStint(onField);
     addEvent(`${tag(bench)} ⇄ ${tag(onField)} (${posLabel}, ${fmt(elapsed)})`, '🔁');
+    undoStintChange = () => { if (openStint) openStint.checkOut = null; };
   } else {
     // still setting the starting lineup — this is a correction, not a real sub;
     // drop the outgoing player's stint entirely rather than logging a phantom few seconds
     const idx = onField.stints.findIndex(s => s.checkOut === null);
+    const removedStint = idx !== -1 ? onField.stints[idx] : null;
     if (idx !== -1) onField.stints.splice(idx, 1);
     addEvent(`Starting lineup correction — ${tag(bench)} replaces ${tag(onField)} at ${posLabel}`, '✏️');
+    undoStintChange = () => { if (removedStint) onField.stints.splice(idx, 0, removedStint); };
   }
 
   onField.position = null;
   bench.position = pos;
   const checkIn = lineupLocked ? elapsed : currentHalfKickoffElapsed;
   bench.stints.push({ position: pos, checkIn, checkOut: null });
+
+  pushUndo(`Sub — ${bench.name} in for ${onField.name}`, () => {
+    bench.stints.pop();
+    bench.position = null;
+    onField.position = pos;
+    undoStintChange();
+    events.shift();
+  });
+
   closeModal();
   renderAll();
 }
@@ -2490,6 +2742,11 @@ function assignToPosition(benchId, posId) {
   } else {
     addEvent(`${tag(bench)} starts at ${posLabel} (kickoff)`, '🟢');
   }
+  pushUndo(`${bench.name} → ${posLabel}`, () => {
+    bench.position = null;
+    bench.stints.pop();
+    events.shift();
+  });
   closeModal();
   renderAll();
 }
@@ -2511,6 +2768,12 @@ function finishGoal(type) {
   const typeLabel = type === 'PK' ? 'PK' : type === 'FK' ? 'free kick' : type === 'OT' ? 'OT/shootout' : 'run of play';
   addEvent(`⚽ Goal (${typeLabel}) — ${tag(p)} (${fmt(elapsed)})`, '⚽');
   showToast(`Goal logged for ${p.name} (${typeLabel})`);
+  pushUndo(`Goal — ${p.name}`, () => {
+    p.goals -= 1;
+    goalEvents.pop();
+    matchGoals.pop();
+    events.shift();
+  });
   closeModal();
   renderAll();
 }
@@ -2520,6 +2783,19 @@ function openOpponentGoal() {
   matchGoals.push({ t: elapsed, side: 'opponent' });
   addEvent(`🥅 Goal against (${fmt(elapsed)})`, '🥅');
   showToast('Opponent goal logged');
+  pushUndo('Opponent goal', () => { matchGoals.pop(); events.shift(); });
+  renderAll();
+}
+
+// Own goal (opponent player puts it in their own net) — counts as a goal FOR
+// our team for every on-field player's on-field net rate, but isn't credited
+// to any individual player's goal count (no one on our team scored it).
+function openOwnGoalForUs() {
+  if (!confirm(`Log an own goal by ${matchOpponent} (goal for us) at ${fmt(elapsed)}?`)) return;
+  matchGoals.push({ t: elapsed, side: 'us' });
+  addEvent(`⚽ Own goal by ${matchOpponent} — goal for us (${fmt(elapsed)})`, '⚽');
+  showToast('Own goal logged (goal for us)');
+  pushUndo('Own goal (for us)', () => { matchGoals.pop(); events.shift(); });
   renderAll();
 }
 
@@ -2529,9 +2805,16 @@ function logStat(kind) {
     p.assists += 1;
     assistEvents.push({ t: elapsed, playerId: p.id });
     addEvent(`🅰 Assist — ${tag(p)} (${fmt(elapsed)})`, '🅰');
+    pushUndo(`Assist — ${p.name}`, () => { p.assists -= 1; assistEvents.pop(); events.shift(); });
   }
-  if (kind === 'yellow') { p.yellows += 1; addEvent(`🟨 Yellow card — ${tag(p)} (${fmt(elapsed)})`, '🟨'); }
-  if (kind === 'red') { p.reds += 1; addEvent(`🟥 Red card — ${tag(p)} (${fmt(elapsed)})`, '🟥'); }
+  if (kind === 'yellow') {
+    p.yellows += 1; addEvent(`🟨 Yellow card — ${tag(p)} (${fmt(elapsed)})`, '🟨');
+    pushUndo(`Yellow card — ${p.name}`, () => { p.yellows -= 1; events.shift(); });
+  }
+  if (kind === 'red') {
+    p.reds += 1; addEvent(`🟥 Red card — ${tag(p)} (${fmt(elapsed)})`, '🟥');
+    pushUndo(`Red card — ${p.name}`, () => { p.reds -= 1; events.shift(); });
+  }
   const labels = { assist: 'Assist', yellow: 'Yellow card', red: 'Red card' };
   showToast(`${labels[kind]} logged for ${p.name}`);
   closeModal();
@@ -2696,6 +2979,9 @@ function renderAll() {
   renderLog();
   renderSummary();
   updateSubsButton();
+  updateUndoButton();
+  updateScoreDisplay();
+  updateCountdown();
 }
 </script>
 
