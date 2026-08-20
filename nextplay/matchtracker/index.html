@@ -469,18 +469,63 @@
     text-align: center; font-size: 11px; color: var(--muted); margin-top: 22px; padding: 0 20px;
   }
 
-  /* ---------- Filter chips (Season Stats) ---------- */
-  .filter-block { margin-bottom: 14px; }
-  .filter-block .field-label { margin-bottom: 6px; }
-  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip {
-    font-family: var(--font-body);
-    padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--gridline);
-    background: var(--surface-raised); color: var(--text-secondary);
-    font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  /* ---------- Filter dropdowns (Season Stats) ---------- */
+  .filter-dropdown-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+  .filter-dropdown { position: relative; flex: 1; min-width: 130px; }
+  .filter-dropdown-btn {
+    width: 100%; font-family: var(--font-body); text-align: left;
+    padding: 9px 10px; border-radius: 9px; border: 1.5px solid var(--gridline);
+    background: var(--surface-raised); color: var(--text-primary);
+    font-size: 12.5px; font-weight: 600; cursor: pointer;
   }
-  .chip.selected { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-  .chip-empty { font-size: 11px; color: var(--muted); }
+  .filter-dropdown-btn:hover { border-color: var(--accent); }
+  .filter-dropdown.open .filter-dropdown-btn { border-color: var(--accent); background: var(--accent-tint); }
+  .fd-count { color: var(--accent); font-weight: 700; }
+  .filter-dropdown-panel {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 40;
+    background: var(--navy-tint); border: 1.5px solid var(--gridline); border-radius: 10px;
+    padding: 8px; max-height: 240px; overflow-y: auto;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  }
+  .filter-dropdown.open .filter-dropdown-panel { display: block; }
+  .fd-option {
+    display: flex; align-items: center; gap: 8px; padding: 7px 6px; border-radius: 6px;
+    font-size: 12.5px; cursor: pointer;
+  }
+  .fd-option:hover { background: var(--surface-raised); }
+  .fd-option input { accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; }
+  .fd-empty { font-size: 11px; color: var(--muted); padding: 4px 6px; }
+
+  /* ---------- Player stat cards (Season Stats results) ---------- */
+  .stat-player-card {
+    background: var(--surface-1); border: 1.5px solid var(--gridline); border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 10px;
+  }
+  .stat-player-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; margin-bottom: 10px; }
+  .stat-player-name { font-family: var(--font-heading); font-weight: 700; font-size: 15px; }
+  .stat-player-cards { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .stat-player-primary { text-align: right; flex-shrink: 0; }
+  .stat-player-primary-val {
+    font-family: var(--font-heading); font-weight: 800; font-size: 22px; color: var(--accent);
+    font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .stat-player-primary-label {
+    font-family: var(--font-accent); font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--text-secondary); margin-top: 3px; max-width: 140px; margin-left: auto;
+  }
+  .stat-player-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    border-top: 1px solid var(--gridline); padding-top: 10px;
+  }
+  .stat-player-grid > div { text-align: center; }
+  .stat-player-grid label {
+    display: block; font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--muted); margin-bottom: 2px;
+  }
+  .stat-player-grid span {
+    font-family: var(--font-heading); font-weight: 700; font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
 
   /* ---------- Connection status ---------- */
   .conn-status {
@@ -630,6 +675,12 @@
           <input type="number" class="text-input" id="quickLogOppGoalsInput" min="0" value="0" oninput="renderQuickLogValidation()">
         </div>
       </div>
+      <div class="field-row" style="margin-top:10px;">
+        <div class="field-col">
+          <span class="field-label">Opponent's national ranking (optional)</span>
+          <input type="number" class="text-input" id="quickLogOpponentRankInput" min="1" placeholder="e.g. 42 — leave blank if unknown">
+        </div>
+      </div>
     </div>
 
     <div class="setup-card">
@@ -666,32 +717,42 @@
           <h2>Filters</h2>
           <button class="refresh-btn" onclick="loadStatsData()">🔄 Refresh</button>
         </div>
-        <div class="filter-block">
-          <span class="field-label">Team</span>
-          <div class="chip-row" id="filterTeams"></div>
-        </div>
-        <div class="filter-block">
-          <span class="field-label">Player</span>
-          <div class="chip-row" id="filterPlayers"></div>
-        </div>
-        <div class="filter-block">
-          <span class="field-label">Opponent</span>
-          <div class="chip-row" id="filterOpponents"></div>
-        </div>
-        <div class="filter-block">
-          <span class="field-label">Game type</span>
-          <div class="chip-row" id="filterGameTypes"></div>
+        <div class="filter-dropdown-row">
+          <div class="filter-dropdown" id="filterDropdown-teams">
+            <button class="filter-dropdown-btn" onclick="toggleFilterDropdown('teams')">Team <span class="fd-count" id="fdCount-teams"></span> ▾</button>
+            <div class="filter-dropdown-panel" id="filterPanel-teams"></div>
+          </div>
+          <div class="filter-dropdown" id="filterDropdown-players">
+            <button class="filter-dropdown-btn" onclick="toggleFilterDropdown('players')">Player <span class="fd-count" id="fdCount-players"></span> ▾</button>
+            <div class="filter-dropdown-panel" id="filterPanel-players"></div>
+          </div>
+          <div class="filter-dropdown" id="filterDropdown-opponents">
+            <button class="filter-dropdown-btn" onclick="toggleFilterDropdown('opponents')">Opponent <span class="fd-count" id="fdCount-opponents"></span> ▾</button>
+            <div class="filter-dropdown-panel" id="filterPanel-opponents"></div>
+          </div>
+          <div class="filter-dropdown" id="filterDropdown-gameTypes">
+            <button class="filter-dropdown-btn" onclick="toggleFilterDropdown('gameTypes')">Game type <span class="fd-count" id="fdCount-gameTypes"></span> ▾</button>
+            <div class="filter-dropdown-panel" id="filterPanel-gameTypes"></div>
+          </div>
         </div>
         <div class="roster-note" id="filterSummary"></div>
       </div>
 
       <div class="summary-card">
-        <div class="tab-bar">
-          <button class="tab-btn active" id="statsTabMinutes" onclick="showStatsTab('minutes')">Minutes played</button>
-          <button class="tab-btn" id="statsTabTable" onclick="showStatsTab('table')">Full stat table</button>
+        <div class="field-row" style="margin-bottom:12px;">
+          <div class="field-col">
+            <span class="field-label">Sort by</span>
+            <select class="select-input" id="statsSortInput" onchange="renderStatsResults()">
+              <option value="weighted">Weighted Season Offensive Effectiveness Score</option>
+              <option value="totalMinutes">Total Minutes Played</option>
+              <option value="avgMinutes">Avg Minutes/Game</option>
+              <option value="totalGoals">Total Goals</option>
+              <option value="totalAssists">Total Assists</option>
+              <option value="totalContributions">Total Goal Contributions</option>
+            </select>
+          </div>
         </div>
-        <div id="statsMinutes"></div>
-        <div id="statsTable" style="display:none;"></div>
+        <div id="statsResults"></div>
         <div class="legend-note" id="statsLegend"></div>
       </div>
     </div>
@@ -740,6 +801,12 @@
             <option value="S">Showcase</option>
             <option value="W">Winter</option>
           </select>
+        </div>
+      </div>
+      <div class="field-row" style="margin-top:10px;">
+        <div class="field-col">
+          <span class="field-label">Opponent's national ranking (optional)</span>
+          <input type="number" class="text-input" id="opponentRankInput" min="1" placeholder="e.g. 42 — leave blank if unknown">
         </div>
       </div>
     </div>
@@ -1180,7 +1247,8 @@ function buildGamePayload() {
       opponent: matchOpponent,
       game_date: matchDate || new Date().toISOString().slice(0, 10),
       game_type: gameType,
-      format: selectedFormatKey
+      format: selectedFormatKey,
+      opponent_national_rank: matchOpponentRank
     },
     stints,
     events
@@ -1260,6 +1328,7 @@ function goToQuickLog() {
   document.getElementById('quickLogGameTypeInput').value = 'F';
   document.getElementById('quickLogFormatInput').value = '9v9';
   document.getElementById('quickLogOppGoalsInput').value = '0';
+  document.getElementById('quickLogOpponentRankInput').value = '';
   renderQuickLogTeamChoices();
   renderQuickLogPlayerRows();
   renderQuickLogSaveState();
@@ -1454,7 +1523,11 @@ function buildQuickLogPayload() {
       opponent: document.getElementById('quickLogOpponentInput').value.trim(),
       game_date: document.getElementById('quickLogDateInput').value || new Date().toISOString().slice(0, 10),
       game_type: document.getElementById('quickLogGameTypeInput').value,
-      format: document.getElementById('quickLogFormatInput').value
+      format: document.getElementById('quickLogFormatInput').value,
+      opponent_national_rank: (() => {
+        const raw = document.getElementById('quickLogOpponentRankInput').value.trim();
+        return raw ? Number(raw) : null;
+      })()
     },
     stints,
     events
@@ -1502,8 +1575,10 @@ async function saveQuickLoggedGame() {
 
   // Reset per-player fields but keep team/date/format selected so logging
   // several past games back-to-back doesn't require re-picking the team each time.
+  // Opponent, its goals, and its national rank reset too since those are specific to the game just saved.
   document.getElementById('quickLogOpponentInput').value = '';
   document.getElementById('quickLogOppGoalsInput').value = '0';
+  document.getElementById('quickLogOpponentRankInput').value = '';
   renderQuickLogPlayerRows();
   renderQuickLogSaveState();
 }
@@ -1585,7 +1660,7 @@ async function syncRostersOnConnect() {
 /* ---------------- Season Stats screen ---------------- */
 let statsRawData = null; // { games: [], stints: [], events: [] }
 let statsFilters = { teams: new Set(), players: new Set(), opponents: new Set(), gameTypes: new Set() };
-let statsTab = 'minutes';
+let statsOpenDropdown = null;
 
 function goToStats() {
   hideAllScreens();
@@ -1624,6 +1699,7 @@ async function loadStatsData() {
 
 const GAME_TYPE_LABELS = { F: 'Friendly', L: 'League', T: 'Tournament', S: 'Showcase', W: 'Winter' };
 
+/* ---------------- Filter dropdowns (multi-select) ---------------- */
 function renderStatsFilters() {
   if (!statsRawData) return;
   const { games, stints, events } = statsRawData;
@@ -1633,26 +1709,146 @@ function renderStatsFilters() {
   const gameTypeSet = new Set(games.map(g => g.game_type));
   const playerSet = new Set([...stints.map(s => s.player_name), ...events.map(e => e.player_name)]);
 
-  renderChipRow('filterTeams', 'teams', [...teamSet].sort());
-  renderChipRow('filterPlayers', 'players', [...playerSet].sort());
-  renderChipRow('filterOpponents', 'opponents', [...opponentSet].sort());
-  renderChipRow('filterGameTypes', 'gameTypes', [...gameTypeSet].sort(), v => GAME_TYPE_LABELS[v] || v);
+  renderFilterDropdown('teams', [...teamSet].sort());
+  renderFilterDropdown('players', [...playerSet].sort());
+  renderFilterDropdown('opponents', [...opponentSet].sort());
+  renderFilterDropdown('gameTypes', [...gameTypeSet].sort(), v => GAME_TYPE_LABELS[v] || v);
 }
 
-function renderChipRow(elId, dim, values, labelFn) {
-  const el = document.getElementById(elId);
-  if (!values.length) { el.innerHTML = '<div class="chip-empty">No games saved yet</div>'; return; }
-  el.innerHTML = values.map(v => `
-    <div class="chip ${statsFilters[dim].has(v) ? 'selected' : ''}" onclick="toggleStatsFilter('${dim}', '${escapeAttr(v).replace(/'/g, "\\'")}')">${escapeAttr(labelFn ? labelFn(v) : v)}</div>
+function renderFilterDropdown(dim, values, labelFn) {
+  const panel = document.getElementById('filterPanel-' + dim);
+  const countEl = document.getElementById('fdCount-' + dim);
+  const selected = statsFilters[dim];
+  countEl.textContent = selected.size ? `(${selected.size})` : '';
+  if (!values.length) {
+    panel.innerHTML = '<div class="fd-empty">No games saved yet</div>';
+    return;
+  }
+  panel.innerHTML = values.map(v => `
+    <label class="fd-option">
+      <input type="checkbox" ${selected.has(v) ? 'checked' : ''} onchange="toggleStatsFilter('${dim}', '${escapeAttr(v).replace(/'/g, "\\'")}')">
+      <span>${escapeAttr(labelFn ? labelFn(v) : v)}</span>
+    </label>
   `).join('');
 }
+
+function toggleFilterDropdown(dim) {
+  const isOpen = statsOpenDropdown === dim;
+  document.querySelectorAll('.filter-dropdown').forEach(el => el.classList.remove('open'));
+  statsOpenDropdown = isOpen ? null : dim;
+  if (statsOpenDropdown) document.getElementById('filterDropdown-' + dim).classList.add('open');
+}
+
+document.addEventListener('click', (e) => {
+  if (!statsOpenDropdown) return;
+  const openEl = document.getElementById('filterDropdown-' + statsOpenDropdown);
+  if (openEl && !openEl.contains(e.target)) {
+    openEl.classList.remove('open');
+    statsOpenDropdown = null;
+  }
+});
 
 function toggleStatsFilter(dim, value) {
   const set = statsFilters[dim];
   if (set.has(value)) set.delete(value); else set.add(value);
   renderStatsFilters();
+  // re-open the dropdown the user is actively working in, since re-rendering rebuilds the DOM
+  if (statsOpenDropdown) document.getElementById('filterDropdown-' + statsOpenDropdown).classList.add('open');
   renderStatsResults();
 }
+
+/* ---------------- Offensive Effectiveness Score ----------------
+   Full formula chain documented in the project's
+   offensive-effectiveness-score-formula.md doc. Summary:
+   1. On-Field Net Rate = ((GF-GA while on) / minutes played) * total minutes available
+   2. Individual Contribution Rate = ((goals + 0.75*assists) / minutes played) * total minutes available
+   3. Offensive Effectiveness Score = OnFieldNetRate*0.75 + IndividualRate*0.25
+   4. Opponent Difficulty Score (0-1, per team, per opponent, season-to-date) =
+      (maxRank_forTeam - thisOpponentRank) / (maxRank_forTeam - minRank_forTeam)
+      — blank ranks default to that team's average logged rank; if every logged
+      rank for a team is identical (most commonly just one game so far), there's
+      no range to normalize against, so difficulty defaults to 1.0.
+   5. Offensive Effectiveness Score (Weighted) = score * difficulty
+   6. Weighted Season Offensive Effectiveness Score = average of #5 across every
+      game the player had minutes in. */
+
+function computeOpponentDifficultyByGame(games) {
+  const byTeam = {};
+  games.forEach(g => { (byTeam[g.team_id] = byTeam[g.team_id] || []).push(g); });
+
+  const difficultyByGameId = {};
+  Object.values(byTeam).forEach(teamGames => {
+    const ranked = teamGames
+      .map(g => g.opponent_national_rank)
+      .filter(r => r !== null && r !== undefined && r !== '')
+      .map(Number);
+    const avgRank = ranked.length ? ranked.reduce((a, b) => a + b, 0) / ranked.length : null;
+
+    const effective = teamGames.map(g => {
+      const raw = (g.opponent_national_rank !== null && g.opponent_national_rank !== undefined && g.opponent_national_rank !== '')
+        ? Number(g.opponent_national_rank) : avgRank;
+      return { id: g.id, rank: raw };
+    }).filter(x => x.rank !== null && !Number.isNaN(x.rank));
+
+    if (!effective.length) return; // no ranking data at all for this team yet — leave undefined, defaults to 1.0 downstream
+
+    const ranks = effective.map(x => x.rank);
+    const maxRank = Math.max(...ranks), minRank = Math.min(...ranks);
+    effective.forEach(x => {
+      difficultyByGameId[x.id] = (maxRank === minRank) ? 1 : (maxRank - x.rank) / (maxRank - minRank);
+    });
+  });
+  return difficultyByGameId;
+}
+
+// One row per (game, player) who actually appeared (minutes > 0) in that game.
+function computePlayerGameRows(games, stints, events) {
+  const gameMap = {};
+  games.forEach(g => { gameMap[g.id] = g; });
+  const difficultyByGameId = computeOpponentDifficultyByGame(games);
+
+  const rowMap = {};
+  function ensure(gameId, name) {
+    const k = gameId + '::' + name;
+    if (!rowMap[k]) rowMap[k] = { gameId, name, minutes: 0, goalsFor: 0, goalsAgainst: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
+    return rowMap[k];
+  }
+  stints.forEach(s => {
+    const r = ensure(s.game_id, s.player_name);
+    r.minutes += Number(s.minutes) || 0;
+    r.goalsFor += Number(s.goals_for) || 0;
+    r.goalsAgainst += Number(s.goals_against) || 0;
+  });
+  events.forEach(e => {
+    const r = ensure(e.game_id, e.player_name);
+    if (e.event_type === 'goal') r.goals += 1;
+    else if (e.event_type === 'assist') r.assists += 1;
+    else if (e.event_type === 'yellow') r.yellows += 1;
+    else if (e.event_type === 'red') r.reds += 1;
+  });
+
+  return Object.values(rowMap)
+    .filter(r => r.minutes > 0 && gameMap[r.gameId])
+    .map(r => {
+      const game = gameMap[r.gameId];
+      const format = FORMATS[game.format];
+      const totalAvailable = format ? format.standardHalfMin * 2 : 60;
+      const onFieldNetRate = ((r.goalsFor - r.goalsAgainst) / r.minutes) * totalAvailable;
+      const individualRate = ((r.goals + 0.75 * r.assists) / r.minutes) * totalAvailable;
+      const effScore = onFieldNetRate * 0.75 + individualRate * 0.25;
+      const difficulty = difficultyByGameId[r.gameId] !== undefined ? difficultyByGameId[r.gameId] : 1;
+      return { ...r, game, onFieldNetRate, individualRate, effScore, difficulty, weightedScore: effScore * difficulty };
+    });
+}
+
+const SORT_LABELS = {
+  weighted: 'Weighted Season Offensive Effectiveness Score',
+  totalMinutes: 'Total Minutes Played',
+  avgMinutes: 'Avg Minutes/Game',
+  totalGoals: 'Total Goals',
+  totalAssists: 'Total Assists',
+  totalContributions: 'Total Goal Contributions'
+};
 
 function renderStatsResults() {
   if (!statsRawData) return;
@@ -1668,60 +1864,68 @@ function renderStatsResults() {
   document.getElementById('filterSummary').textContent =
     `${matchingGameIds.size} game${matchingGameIds.size === 1 ? '' : 's'} match${matchingGameIds.size === 1 ? 'es' : ''} these filters.`;
 
+  // Difficulty scores are computed from each team's FULL season history (not the
+  // filtered subset) — filters decide which games get averaged in, not what
+  // "hardest opponent this team has faced" means.
+  const allPlayerGameRows = computePlayerGameRows(games, stints, events);
+  const filteredRows = allPlayerGameRows.filter(r =>
+    matchingGameIds.has(r.gameId) && (playerFilter.size === 0 || playerFilter.has(r.name))
+  );
+
   const perPlayer = {};
-  function ensure(name) {
-    if (!perPlayer[name]) perPlayer[name] = { name, minutes: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
-    return perPlayer[name];
-  }
+  filteredRows.forEach(r => {
+    if (!perPlayer[r.name]) {
+      perPlayer[r.name] = { name: r.name, totalMinutes: 0, gamesAppeared: 0, totalGoals: 0, totalAssists: 0, yellows: 0, reds: 0, weightedSum: 0 };
+    }
+    const p = perPlayer[r.name];
+    p.totalMinutes += r.minutes;
+    p.gamesAppeared += 1;
+    p.totalGoals += r.goals;
+    p.totalAssists += r.assists;
+    p.yellows += r.yellows;
+    p.reds += r.reds;
+    p.weightedSum += r.weightedScore;
+  });
 
-  stints.filter(s => matchingGameIds.has(s.game_id) && (playerFilter.size === 0 || playerFilter.has(s.player_name)))
-    .forEach(s => { ensure(s.player_name).minutes += Number(s.minutes) || 0; });
+  const rows = Object.values(perPlayer).map(p => ({
+    ...p,
+    avgMinutes: p.totalMinutes / p.gamesAppeared,
+    totalContributions: p.totalGoals + p.totalAssists,
+    weighted: p.weightedSum / p.gamesAppeared
+  }));
 
-  events.filter(e => matchingGameIds.has(e.game_id) && (playerFilter.size === 0 || playerFilter.has(e.player_name)))
-    .forEach(e => {
-      const row = ensure(e.player_name);
-      if (e.event_type === 'goal') row.goals += 1;
-      else if (e.event_type === 'assist') row.assists += 1;
-      else if (e.event_type === 'yellow') row.yellows += 1;
-      else if (e.event_type === 'red') row.reds += 1;
-    });
+  const sortBy = document.getElementById('statsSortInput').value || 'weighted';
+  rows.sort((a, b) => b[sortBy] - a[sortBy]);
 
-  const rows = Object.values(perPlayer).sort((a, b) => b.minutes - a.minutes);
-  const maxMinutes = Math.max(1, ...rows.map(r => r.minutes));
+  const fmt1 = n => Math.round(n * 10) / 10;
+  const primaryVal = (r) => sortBy === 'totalMinutes' || sortBy === 'totalGoals' || sortBy === 'totalAssists' || sortBy === 'totalContributions'
+    ? r[sortBy] : fmt1(r[sortBy]);
 
-  document.getElementById('statsMinutes').innerHTML = rows.length ? rows.map(r => `
-    <div class="bar-row">
-      <div class="bname">${escapeAttr(r.name)}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${Math.round((r.minutes / maxMinutes) * 100)}%"></div></div>
-      <div class="bar-val">${r.minutes}</div>
+  document.getElementById('statsResults').innerHTML = rows.length ? rows.map(r => `
+    <div class="stat-player-card">
+      <div class="stat-player-head">
+        <div>
+          <div class="stat-player-name">${escapeAttr(r.name)}</div>
+          <div class="stat-player-cards">${r.gamesAppeared} game${r.gamesAppeared === 1 ? '' : 's'}${r.yellows ? ' · 🟨' + r.yellows : ''}${r.reds ? ' · 🟥' + r.reds : ''}</div>
+        </div>
+        <div class="stat-player-primary">
+          <div class="stat-player-primary-val">${primaryVal(r)}</div>
+          <div class="stat-player-primary-label">${SORT_LABELS[sortBy]}</div>
+        </div>
+      </div>
+      <div class="stat-player-grid">
+        <div><label>Total Min</label><span>${r.totalMinutes}</span></div>
+        <div><label>Avg Min/Game</label><span>${fmt1(r.avgMinutes)}</span></div>
+        <div><label>Goals</label><span>${r.totalGoals}</span></div>
+        <div><label>Assists</label><span>${r.totalAssists}</span></div>
+        <div><label>Contributions</label><span>${r.totalContributions}</span></div>
+        <div><label>Weighted Score</label><span>${fmt1(r.weighted)}</span></div>
+      </div>
     </div>
   `).join('') : '<div class="log-empty">No games match these filters yet.</div>';
 
-  document.getElementById('statsTable').innerHTML = rows.length ? `
-    <div class="stat-table-row head"><div>#</div><div>Player</div><div class="num">Min</div><div class="num">G</div><div class="num">A</div></div>
-    ${rows.map(r => `
-      <div class="stat-table-row">
-        <div></div>
-        <div>${escapeAttr(r.name)}${r.yellows ? ' 🟨' + r.yellows : ''}${r.reds ? ' 🟥' + r.reds : ''}</div>
-        <div class="num">${r.minutes}</div>
-        <div class="num">${r.goals}</div>
-        <div class="num">${r.assists}</div>
-      </div>
-    `).join('')}
-  ` : '<div class="log-empty">No games match these filters yet.</div>';
-
-  document.getElementById('statsLegend').textContent = statsTab === 'minutes'
-    ? 'Bar length = total minutes played across the filtered games.'
-    : 'Totals across every filtered game.';
-}
-
-function showStatsTab(tab) {
-  statsTab = tab;
-  document.getElementById('statsTabMinutes').classList.toggle('active', tab === 'minutes');
-  document.getElementById('statsTabTable').classList.toggle('active', tab === 'table');
-  document.getElementById('statsMinutes').style.display = tab === 'minutes' ? 'block' : 'none';
-  document.getElementById('statsTable').style.display = tab === 'table' ? 'block' : 'none';
-  renderStatsResults();
+  document.getElementById('statsLegend').textContent =
+    'Weighted Score = per-game Offensive Effectiveness Score × Opponent Difficulty Score, averaged across games played. Opponent difficulty is scored 0–1 based on the toughest opponent that team has faced this season.';
 }
 
 /* ---------------- Screen navigation ---------------- */
@@ -1892,6 +2096,7 @@ let activePlayerId = null;
 let matchOpponent = '';
 let matchDate = '';
 let gameType = 'F';
+let matchOpponentRank = null; // opponent's national ranking, optional — null when left blank
 let matchGoals = [];     // { t, side: 'us' | 'opponent' }
 let goalEvents = [];     // { t, playerId, type }
 let assistEvents = [];   // { t, playerId }
@@ -1982,6 +2187,8 @@ function _startMatch() {
   rememberOpponent(matchOpponent);
   matchDate = document.getElementById('dateInput').value || new Date().toISOString().slice(0,10);
   gameType = document.getElementById('gameTypeInput').value;
+  const rankRaw = document.getElementById('opponentRankInput').value.trim();
+  matchOpponentRank = rankRaw ? Number(rankRaw) : null;
   POSITIONS = FORMATS[selectedFormatKey].positions;
 
   const roster = TEAMS[selectedTeamKey].roster;
