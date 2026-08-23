@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Next Play Ventures LLC — Travel Sports Buddy</title>
+<meta name="description" content="Next Play Ventures LLC builds Travel Sports Buddy, a smart packing checklist app for youth travel sports families.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Oswald:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand:#1C2E4A;
+    --brand-dark:#111F33;
+    --chalk:#F5F3ED;
+    --card:#FFFFFF;
+    --ink:#1B2430;
+    --ink-soft:#5B6570;
+    --line:#DCD6C6;
+    --gold:#C9A227;
+    --gold-soft:#F4E8C1;
+    --gold-ink:#7A5C0C;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; background:var(--chalk); color:var(--ink);
+    font-family:'Work Sans', sans-serif; line-height:1.55;
+  }
+  .wrap{ max-width:880px; margin:0 auto; padding:0 24px; }
+
+  /* Hero */
+  .hero{
+    background:var(--brand); color:#EDE7D8; padding:90px 0 100px; position:relative; overflow:hidden;
+  }
+  .hero::after{
+    content:""; position:absolute; left:0; right:0; bottom:0; height:6px;
+    background:repeating-linear-gradient(90deg, var(--gold) 0 28px, transparent 28px 40px);
+    opacity:.9;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:12.5px; letter-spacing:2.5px; text-transform:uppercase;
+    color:var(--gold); margin-bottom:18px;
+  }
+  .hero h1{
+    font-family:'Archivo Black', sans-serif; font-size:clamp(34px, 6vw, 56px); line-height:1.05; letter-spacing:-0.5px;
+    margin:0 0 20px; max-width:640px;
+  }
+  .hero p{ font-family:'Oswald', sans-serif; font-size:19px; font-weight:400; color:#C9D2DE; max-width:520px; margin:0; }
+
+  /* Sections */
+  section{ padding:70px 0; }
+  .section-label{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--brand); margin-bottom:14px; display:flex; align-items:center; gap:12px;
+  }
+  .section-label::after{ content:""; flex:1; height:1px; background:var(--line); }
+  h2{
+    font-family:'Oswald', sans-serif; font-weight:600; font-size:28px; margin:0 0 18px; color:var(--ink);
+  }
+  p{ font-size:16px; color:var(--ink-soft); max-width:640px; }
+
+  /* About */
+  .about-grid{ display:grid; grid-template-columns:1fr; gap:28px; }
+
+  /* Product card */
+  .product-card{
+    background:var(--card); border:1px solid var(--line); border-radius:16px; padding:32px; margin-top:10px;
+    position:relative;
+  }
+  .status-tag{
+    display:inline-flex; align-items:center; gap:6px; font-family:'IBM Plex Mono', monospace; font-size:11.5px;
+    letter-spacing:0.5px; text-transform:uppercase; background:var(--gold-soft); color:var(--gold-ink);
+    padding:5px 11px; border-radius:999px; margin-bottom:16px;
+  }
+  .product-card h3{
+    font-family:'Oswald', sans-serif; font-weight:700; font-size:24px; margin:0 0 10px; color:var(--brand);
+  }
+  .sport-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:22px; }
+  .sport-chip{
+    font-family:'Oswald', sans-serif; font-size:13.5px; font-weight:500; background:var(--chalk);
+    border:1px solid var(--line); border-radius:999px; padding:8px 14px; color:var(--ink);
+  }
+
+  /* Contact */
+  .contact-card{
+    background:var(--brand); color:#EDE7D8; border-radius:16px; padding:36px 32px; display:flex;
+    flex-wrap:wrap; align-items:center; justify-content:space-between; gap:20px;
+  }
+  .contact-card .label{ font-family:'IBM Plex Mono', monospace; font-size:12px; color:#9FB0C6; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+  .contact-card a{ color:var(--gold); font-family:'Oswald', sans-serif; font-size:20px; font-weight:600; text-decoration:none; }
+  .contact-card a:hover{ text-decoration:underline; }
+
+  /* Privacy */
+  .privacy p{ font-size:14.5px; }
+  .privacy h3{ font-family:'Oswald', sans-serif; font-size:16px; font-weight:600; margin:22px 0 6px; color:var(--ink); }
+
+  footer{
+    border-top:1px solid var(--line); padding:28px 0; text-align:center;
+    font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--ink-soft);
+  }
+
+  @media (max-width:600px){
+    .hero{ padding:64px 0 76px; }
+    section{ padding:52px 0; }
+    .contact-card{ flex-direction:column; align-items:flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Next Play Ventures LLC</div>
+    <h1>Built by a sports parent, for sports parents.</h1>
+    <p>We make tools that take the guesswork out of travel sports — starting with the thing every family forgets something for: packing.</p>
+  </div>
+</div>
+
+<section id="about">
+  <div class="wrap">
+    <div class="section-label">About</div>
+    <div class="about-grid">
+      <p>Next Play Ventures LLC was started by a travel-sports parent who got tired of re-learning what to pack for every new tournament, sport, and season. We build practical, no-nonsense tools for the families living out of a duffel bag every weekend — players, parents, and coaches alike.</p>
+    </div>
+  </div>
+</section>
+
+<section id="product">
+  <div class="wrap">
+    <div class="section-label">What we're building</div>
+    <h2>Travel Sports Buddy</h2>
+    <p>A smart, sport-specific packing checklist app for youth travel sports. Pick your sport, tell it who's packing and how you're getting there, and it builds the right list — every time.</p>
+    <div class="product-card">
+      <div class="status-tag">● In development</div>
+      <h3>Sport-specific packing, built for real tournaments</h3>
+      <p style="margin-bottom:0;">Six checklists per sport — game day, hotel, sideline, first aid, and travel day — with smart filters for who's packing, how you're traveling, and how long the trip is.</p>
+      <div class="sport-row">
+        <div class="sport-chip">⚽ Soccer</div>
+        <div class="sport-chip">🏀 Basketball</div>
+        <div class="sport-chip">⚾ Baseball / Softball</div>
+        <div class="sport-chip">🏐 Volleyball</div>
+        <div class="sport-chip">🏒 Hockey</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="contact">
+  <div class="wrap">
+    <div class="section-label">Get in touch</div>
+    <div class="contact-card">
+      <div>
+        <div class="label">Email us</div>
+        <a href="mailto:amanda.sander@nextplayventures.org">amanda.sander@nextplayventures.org</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="privacy" class="privacy">
+  <div class="wrap">
+    <div class="section-label">Privacy Policy</div>
+    <h2>How we handle your information</h2>
+    <p>This policy covers Next Play Ventures LLC's website and our app, Travel Sports Buddy, currently in development.</p>
+
+    <h3>What we collect</h3>
+    <p>When you sign in to Travel Sports Buddy, we collect your name and email address from your Google or Apple account, so you can access your own trips and packing lists. We store the trips, packing lists, and custom items you create so you can access them across sessions and share them with people you invite.</p>
+
+    <h3>What we don't do</h3>
+    <p>We don't sell your personal information. We don't share your trip or packing data with anyone except the people you specifically invite to a shared trip.</p>
+
+    <h3>Advertising</h3>
+    <p>Travel Sports Buddy plans to show ads through Google AdMob and may include Amazon affiliate links on relevant products. These services may collect limited technical information (like device type) as described in Google's and Amazon's own privacy policies.</p>
+
+    <h3>Questions</h3>
+    <p>Reach out any time at <a href="mailto:amanda.sander@nextplayventures.org" style="color:var(--brand);">amanda.sander@nextplayventures.org</a>. This policy will be expanded and finalized before Travel Sports Buddy's public launch.</p>
+  </div>
+</section>
+
+<footer>
+  © <span id="year"></span> Next Play Ventures LLC. All rights reserved.
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>
