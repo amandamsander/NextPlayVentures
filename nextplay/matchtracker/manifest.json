@@ -1,6 +1,6 @@
 {
-  "name": "Sideline Match Stat Tracker",
-  "short_name": "Match Tracker",
+  "name": "Next Play Stats",
+  "short_name": "Next Play Stats",
   "description": "Track minutes, positions, subs, goals, assists, and cards during games.",
   "start_url": "./index.html",
   "scope": "./",

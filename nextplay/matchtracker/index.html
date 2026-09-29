@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Sideline — Match Stat Tracker Prototype</title>
+<title>Next Play Stats</title>
 
 <!-- Installable home-screen app support -->
 <link rel="manifest" href="manifest.json">
@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Match Tracker">
+<meta name="apple-mobile-web-app-title" content="Next Play Stats">
 <meta name="mobile-web-app-capable" content="yes">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -604,10 +604,13 @@
 <header class="app-header">
   <div class="row">
     <div>
-      <h1 id="headerTitle">Match Stat Tracker</h1>
+      <h1 id="headerTitle">Next Play Stats</h1>
       <div class="sub" id="headerSub">Set up a game to start tracking</div>
     </div>
-    <div class="badge-note">PROTOTYPE</div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <div id="authControl" class="badge-note" style="cursor:pointer;" onclick="openAuthModal()">Sign in</div>
+      <div class="badge-note">PROTOTYPE</div>
+    </div>
   </div>
 </header>
 
@@ -669,6 +672,8 @@
         </div>
       </div>
       <div class="roster-note">Required to start a game, log a past game, or edit this roster. Leave blank for no passcode.</div>
+
+      <div id="teamOwnershipPanel" style="margin-top:14px;"></div>
     </div>
 
     <div class="setup-card">
@@ -1013,6 +1018,34 @@
   </div>
 </div>
 
+<!-- Sign-in modal (Google or email magic link) -->
+<div class="modal-backdrop" id="authModal">
+  <div class="modal-sheet">
+    <button class="modal-close" onclick="closeAuthModal()">✕</button>
+    <div id="authModalSignedOut">
+      <h3>Sign in</h3>
+      <div class="modal-hint">Signing in lets you claim teams and share them with other parents.</div>
+      <button class="start-btn" onclick="signInWithGoogle()" style="display:flex; align-items:center; justify-content:center; gap:8px; background:#fff; color:#3c4043; border:1px solid #dadce0; margin-bottom:14px;">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.6 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 6.1 29.5 4 24 4c-7.9 0-14.7 4.5-18.1 11z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.3 35.4 26.8 36 24 36c-5.3 0-9.7-3.1-11.3-7.6l-6.6 5.1C9.3 39.6 16.1 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.3 5.3C41.4 35.4 44 29.9 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>
+        Sign in with Google
+      </button>
+      <div class="modal-hint" style="margin-bottom:8px;">or use email</div>
+      <input type="email" class="text-input" id="authEmailInput" placeholder="you@example.com" style="margin-bottom:12px;" onkeydown="if(event.key==='Enter') sendMagicLink();">
+      <button class="start-btn" onclick="sendMagicLink()">Send sign-in link</button>
+    </div>
+    <div id="authModalLinkSent" style="display:none;">
+      <h3>Check your email</h3>
+      <div class="modal-hint">We sent a sign-in link to <span id="authEmailSentTo"></span>. Open it on this device to finish signing in.</div>
+      <button class="start-btn" onclick="closeAuthModal()">Got it</button>
+    </div>
+    <div id="authModalSignedIn" style="display:none;">
+      <h3>Signed in</h3>
+      <div class="modal-hint">Signed in as <span id="authSignedInEmail"></span>.</div>
+      <button class="start-btn" onclick="signOutUser()" style="background:var(--danger, #b3312c);">Sign out</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1277,6 +1310,230 @@ function initSupabaseClient() {
     supabaseClient = null;
   }
 }
+
+/* ---------------- Auth (login by email/Google, team sharing) ----------------
+   Sign-in via Supabase Auth (Google OAuth, or email magic link as a
+   backup). This is additive, not a replacement for the existing per-team
+   passcode gate — teams still work exactly as before for anyone who
+   doesn't sign in. Signing in unlocks two things: claiming ownership of a
+   team, and inviting other parents by email to share access to it (see
+   the "Manage teams" screen). */
+let currentUser = null; // { id, email } or null
+
+function updateAuthControl() {
+  const el = document.getElementById('authControl');
+  if (!el) return;
+  el.textContent = currentUser ? currentUser.email.split('@')[0] : 'Sign in';
+}
+
+function openAuthModal() {
+  document.getElementById('authModal').classList.add('open');
+  const signedOut = document.getElementById('authModalSignedOut');
+  const linkSent = document.getElementById('authModalLinkSent');
+  const signedIn = document.getElementById('authModalSignedIn');
+  signedOut.style.display = 'none'; linkSent.style.display = 'none'; signedIn.style.display = 'none';
+  if (currentUser) {
+    document.getElementById('authSignedInEmail').textContent = currentUser.email;
+    signedIn.style.display = 'block';
+  } else {
+    signedOut.style.display = 'block';
+  }
+}
+function closeAuthModal() {
+  document.getElementById('authModal').classList.remove('open');
+}
+
+async function signInWithGoogle() {
+  if (!supabaseClient) { showToast('Not connected — can\'t sign in right now.'); return; }
+  try {
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.href }
+    });
+    if (error) showToast(`Couldn't start Google sign-in: ${error.message}`);
+    // On success the browser navigates away to Google, so nothing else to do here —
+    // it lands back on this page (via redirectTo) already signed in.
+  } catch (e) {
+    showToast('Couldn\'t start Google sign-in — check your connection and try again.');
+  }
+}
+
+async function sendMagicLink() {
+  const email = document.getElementById('authEmailInput').value.trim();
+  if (!email || !email.includes('@')) { showToast('Enter a valid email address.'); return; }
+  if (!supabaseClient) { showToast('Not connected — can\'t sign in right now.'); return; }
+  try {
+    const { error } = await supabaseClient.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.href }
+    });
+    if (error) { showToast(`Couldn't send link: ${error.message}`); return; }
+    document.getElementById('authEmailSentTo').textContent = email;
+    document.getElementById('authModalSignedOut').style.display = 'none';
+    document.getElementById('authModalLinkSent').style.display = 'block';
+  } catch (e) {
+    showToast('Couldn\'t send sign-in link — check your connection and try again.');
+  }
+}
+
+async function signOutUser() {
+  if (supabaseClient) { try { await supabaseClient.auth.signOut(); } catch (e) { /* ignore */ } }
+  currentUser = null;
+  updateAuthControl();
+  closeAuthModal();
+  if (document.getElementById('rosterEditorScreen').style.display !== 'none') renderTeamOwnershipPanel();
+}
+
+function onAuthUserChange(user) {
+  currentUser = user ? { id: user.id, email: user.email } : null;
+  updateAuthControl();
+  if (document.getElementById('rosterEditorScreen') && document.getElementById('rosterEditorScreen').style.display !== 'none') {
+    renderTeamOwnershipPanel();
+  }
+}
+
+function initAuth() {
+  if (!supabaseClient) return;
+  supabaseClient.auth.getSession().then(({ data }) => {
+    onAuthUserChange(data && data.session ? data.session.user : null);
+  });
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    onAuthUserChange(session ? session.user : null);
+  });
+}
+
+/* ---------------- Team ownership & sharing ----------------
+   A team can be "claimed" by whoever signed-in parent sets it up first —
+   this is informational/organizational, not a lockout: the passcode is
+   still what actually gates starting games or editing rosters, so nobody
+   loses access if they skip signing in. The owner can invite other
+   parents by email; those invites live in Supabase's team_members table
+   and get linked to that parent's account automatically the first time
+   they sign in with the matching email. */
+let ownershipPanelMembers = []; // team_members rows for the currently-open team
+
+async function renderTeamOwnershipPanel() {
+  const el = document.getElementById('teamOwnershipPanel');
+  if (!el || !editorCurrentKey) return;
+  const t = TEAMS[editorCurrentKey];
+  if (!t) { el.innerHTML = ''; return; }
+
+  if (!t.label || !t.label.trim()) {
+    el.innerHTML = '<div class="roster-note">Name the team and save it before claiming or sharing it.</div>';
+    return;
+  }
+  if (!supabaseClient) {
+    el.innerHTML = '<div class="roster-note">Sign-in and sharing need a connection — not available offline right now.</div>';
+    return;
+  }
+  if (!currentUser) {
+    el.innerHTML = `
+      <div class="roster-note">
+        <span onclick="openAuthModal()" style="text-decoration:underline; cursor:pointer;">Sign in</span>
+        to claim this team and share it with other parents.
+      </div>`;
+    return;
+  }
+
+  const ownerId = t.ownerId || null;
+  if (!ownerId) {
+    el.innerHTML = `
+      <div class="field-row">
+        <div class="field-col">
+          <span class="field-label">Ownership</span>
+          <div class="roster-note" style="margin:4px 0 8px;">Nobody's claimed this team yet.</div>
+          <button class="start-btn" onclick="claimTeam()">Claim this team</button>
+        </div>
+      </div>`;
+    return;
+  }
+  if (ownerId !== currentUser.id) {
+    el.innerHTML = `<div class="roster-note">This team is owned by another parent. You can still edit it here with the passcode — ask the owner to share it with your email for a signed-in view.</div>`;
+    return;
+  }
+
+  // Signed in and owns this team — show sharing controls.
+  el.innerHTML = `
+    <div class="field-row">
+      <div class="field-col">
+        <span class="field-label">Shared with</span>
+        <div id="teamMembersList" class="roster-note" style="margin:4px 0 8px;">Loading…</div>
+        <div style="display:flex; gap:8px;">
+          <input type="email" class="text-input" id="inviteEmailInput" placeholder="parent@example.com" style="flex:1;" onkeydown="if(event.key==='Enter') inviteParentByEmail();">
+          <button class="start-btn" onclick="inviteParentByEmail()" style="width:auto; padding:0 16px;">Invite</button>
+        </div>
+      </div>
+    </div>`;
+
+  try {
+    const { data, error } = await supabaseClient.from('team_members').select('*').eq('team_id', editorCurrentKey).order('invited_at');
+    if (error) throw error;
+    ownershipPanelMembers = data || [];
+  } catch (e) {
+    ownershipPanelMembers = [];
+  }
+  renderTeamMembersList();
+}
+
+function renderTeamMembersList() {
+  const listEl = document.getElementById('teamMembersList');
+  if (!listEl) return;
+  if (!ownershipPanelMembers.length) {
+    listEl.textContent = 'Not shared with anyone yet.';
+    return;
+  }
+  listEl.innerHTML = ownershipPanelMembers.map(m => `
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:4px 0;">
+      <span>${escapeAttr(m.email)}${m.accepted_at ? '' : ' (invited, not signed in yet)'}</span>
+      <span onclick="removeTeamMember('${m.id}')" style="cursor:pointer; text-decoration:underline;">Remove</span>
+    </div>
+  `).join('');
+}
+
+async function claimTeam() {
+  if (!currentUser || !supabaseClient || !editorCurrentKey) return;
+  try {
+    const { error } = await supabaseClient.from('teams').update({ owner_id: currentUser.id }).eq('id', editorCurrentKey);
+    if (error) throw error;
+    TEAMS[editorCurrentKey].ownerId = currentUser.id;
+    saveTeams();
+    showToast('Team claimed.');
+    renderTeamOwnershipPanel();
+  } catch (e) {
+    showToast('Couldn\'t claim this team — check your connection and try again.');
+  }
+}
+
+async function inviteParentByEmail() {
+  const input = document.getElementById('inviteEmailInput');
+  const email = input.value.trim();
+  if (!email || !email.includes('@')) { showToast('Enter a valid email address.'); return; }
+  if (!supabaseClient || !editorCurrentKey || !currentUser) return;
+  try {
+    const { error } = await supabaseClient.from('team_members').upsert({
+      team_id: editorCurrentKey, email, invited_by: currentUser.id
+    }, { onConflict: 'team_id,email' });
+    if (error) throw error;
+    input.value = '';
+    showToast(`Invited ${email}.`);
+    renderTeamOwnershipPanel();
+  } catch (e) {
+    showToast('Couldn\'t send that invite — check your connection and try again.');
+  }
+}
+
+async function removeTeamMember(memberId) {
+  if (!confirm('Remove this parent\'s access to the team?')) return;
+  if (!supabaseClient) return;
+  try {
+    const { error } = await supabaseClient.from('team_members').delete().eq('id', memberId);
+    if (error) throw error;
+    renderTeamOwnershipPanel();
+  } catch (e) {
+    showToast('Couldn\'t remove them — check your connection and try again.');
+  }
+}
+
 
 /* ---------------- Building a game's season-history payload ----------------
    Mirrors the same normalization math used by the CSV exports, so a saved
@@ -1714,7 +1971,7 @@ async function pullTeamsAndOpponentsFromSupabase() {
         // we already have locally.
         const pin = (remote.pin !== undefined && remote.pin !== null && remote.pin !== '')
           ? remote.pin : ((local && local.pin) || '');
-        TEAMS[remote.id] = { label: remote.label, roster: remote.roster || [], updatedAt: remoteTime, pin };
+        TEAMS[remote.id] = { label: remote.label, roster: remote.roster || [], updatedAt: remoteTime, pin, ownerId: remote.owner_id || null };
         changed = true;
       }
     });
@@ -2083,14 +2340,14 @@ function hideAllScreens() {
 function goToMode() {
   hideAllScreens();
   document.getElementById('modeScreen').style.display = 'block';
-  document.getElementById('headerTitle').textContent = 'Match Stat Tracker';
+  document.getElementById('headerTitle').textContent = 'Next Play Stats';
   document.getElementById('headerSub').textContent = 'Track subs, positions, minutes & stats';
 }
 
 function goToSetup() {
   hideAllScreens();
   document.getElementById('setupScreen').style.display = 'block';
-  document.getElementById('headerTitle').textContent = 'Match Stat Tracker';
+  document.getElementById('headerTitle').textContent = 'Next Play Stats';
   document.getElementById('headerSub').textContent = 'Set up a game to start tracking';
   renderTeamChoices();
   renderOpponentDatalist();
@@ -2149,6 +2406,7 @@ function renderRosterEditor() {
   document.getElementById('editorTeamPin').value = t.pin || '';
   renderEditorTeamChips();
   renderEditorPlayerRows();
+  renderTeamOwnershipPanel();
 }
 
 function updateEditorPin() {
@@ -2236,6 +2494,11 @@ let elapsed = 0;
 let running = false;
 let currentHalf = 1;
 let timerHandle = null;
+let tickAnchorMs = null;  // Date.now() at the last point `elapsed` was known-accurate
+let elapsedAtAnchor = 0;  // `elapsed` value at that anchor point — together these let the
+                           // clock be recomputed from system time instead of counting ticks,
+                           // so a locked/backgrounded screen (which pauses setInterval) can't
+                           // cause the clock to fall behind
 let events = [];
 let activePlayerId = null;
 let matchOpponent = '';
@@ -2317,6 +2580,7 @@ renderTeamChoices();
 renderFormatChoices();
 renderOpponentDatalist();
 initSupabaseClient();
+initAuth();
 flushPendingGames();
 syncRostersOnConnect();
 if (teamsPinMigrationPending) { syncTeamsToSupabase(); teamsPinMigrationPending = false; }
@@ -2357,7 +2621,7 @@ function _startMatch() {
   }));
   // everyone starts on the bench — tap an empty field slot to send a player in
 
-  elapsed = 0; running = false; currentHalf = 1; events = [];
+  elapsed = 0; running = false; currentHalf = 1; events = []; tickAnchorMs = null; elapsedAtAnchor = 0;
   matchGoals = []; goalEvents = []; assistEvents = []; actionStack = [];
   lineupLocked = false; currentHalfKickoffElapsed = 0;
   half1EndElapsed = null; half2StartElapsed = null; half2EndElapsed = null;
@@ -2389,7 +2653,7 @@ function backToSetup() {
   clearInterval(timerHandle);
   hideAllScreens();
   document.getElementById('setupScreen').style.display = 'block';
-  document.getElementById('headerTitle').textContent = 'Match Stat Tracker';
+  document.getElementById('headerTitle').textContent = 'Next Play Stats';
   document.getElementById('headerSub').textContent = 'Set up a game to start tracking';
   renderTeamChoices();
   renderOpponentDatalist();
@@ -2446,21 +2710,47 @@ function toggleClock() {
     : `Half ${currentHalf} — paused`;
   updateCountdown();
   if (running) {
+    tickAnchorMs = Date.now();
+    elapsedAtAnchor = elapsed;
     timerHandle = setInterval(tick, 1000);
   } else {
     clearInterval(timerHandle);
+    timerHandle = null;
+    tickAnchorMs = null;
   }
 }
 
+// Recomputes `elapsed` from system time (Date.now()) rather than counting
+// ticks. A locked or backgrounded phone screen commonly pauses/throttles
+// setInterval entirely — with a tick-counter that means the clock silently
+// falls behind (or stops) until the screen wakes back up. Anchoring to a
+// real timestamp means the moment the interval resumes (or the tab becomes
+// visible again, see visibilitychange below), it catches straight back up
+// to the correct time instead of having lost time forever.
 function tick() {
-  elapsed += 1;
-  players.forEach(p => { if (p.position) p.seconds += 1; });
+  if (!running || tickAnchorMs === null) return;
+  const newElapsed = elapsedAtAnchor + Math.floor((Date.now() - tickAnchorMs) / 1000);
+  const delta = newElapsed - elapsed;
+  if (delta <= 0) return; // interval fired early/duplicate — nothing new to add yet
+  elapsed = newElapsed;
+  players.forEach(p => { if (p.position) p.seconds += delta; });
   document.getElementById('clockDisplay').textContent = fmt(elapsed);
   updateCountdown();
   renderBench();
   renderPitch();
   renderSummary();
 }
+
+// When the screen locks/tab backgrounds, mobile browsers typically pause
+// setInterval outright rather than just throttling it — so instead of one
+// tick catching up gradually, nothing fires at all until it becomes visible
+// again. This forces an immediate resync at that moment instead of waiting
+// for the next scheduled tick (which could itself be up to a second away).
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && running) {
+    tick();
+  }
+});
 
 function setHalf(h, silent) {
   currentHalf = h;
@@ -2518,7 +2808,7 @@ function endHalf() {
 
 function resetGame() {
   if (!confirm('Reset this game? This clears the clock, log, and all minutes/stats (roster stays loaded).')) return;
-  elapsed = 0; running = false; currentHalf = 1; events = [];
+  elapsed = 0; running = false; currentHalf = 1; events = []; tickAnchorMs = null; elapsedAtAnchor = 0;
   matchGoals = []; goalEvents = []; assistEvents = []; actionStack = [];
   lineupLocked = false; currentHalfKickoffElapsed = 0;
   half1EndElapsed = null; half2StartElapsed = null; half2EndElapsed = null;
